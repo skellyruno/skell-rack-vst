@@ -2,6 +2,13 @@
 #include <JuceHeader.h>
 #include "Modules/DSPModules.h"
 
+enum ModuleID
+{
+    ID_Reverser = 1,
+    ID_NoiseGate = 2,
+    ID_Chorus = 3
+};
+
 class ModularFXAudioProcessor : public juce::AudioProcessor
 {
 public:
@@ -30,6 +37,9 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    void updateModuleOrder(const std::vector<int>& newOrder);
+    std::vector<int> getModuleOrder() const;
+
     juce::AudioProcessorValueTreeState apvts;
 
     ReverserDSP reverser;
@@ -37,6 +47,9 @@ public:
     ChorusDSP chorus;
 
 private:
+    std::atomic<int> moduleCount { 3 };
+    std::atomic<int> moduleOrder[3];
+
     std::atomic<float>* revMixParam = nullptr;
     std::atomic<float>* gateThreshParam = nullptr;
     std::atomic<float>* choDepthParam = nullptr;
