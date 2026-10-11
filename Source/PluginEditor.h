@@ -74,7 +74,7 @@ protected:
     juce::TextButton infoButton, moveLeftButton, moveRightButton, removeButton;
 };
 
-// --- Reverser Card[cite: 3] ---
+// --- Reverser Card ---
 class ReverserCard : public ModuleCardBase
 {
 public:
@@ -111,21 +111,21 @@ public:
 
     void paint(juce::Graphics& g) override
     {
-        g.fillAll(juce::Colour(0xFF121212));[cite: 3]
+        g.fillAll(juce::Colour(0xFF121212));
         paintHeader(g, juce::Colours::white);
 
         g.setColour(juce::Colours::grey);
         g.setFont(juce::FontOptions(13.0f));
-        g.drawText("Mix", mixSlider.getX(), mixSlider.getBottom() + 4, mixSlider.getWidth(), 18, juce::Justification::centred);[cite: 3]
-        g.drawText("Time", timeSlider.getX() - 30, timeSlider.getBounds().getCentreY() - 10, 40, 20, juce::Justification::right);[cite: 3]
+        g.drawText("Mix", mixSlider.getX(), mixSlider.getBottom() + 4, mixSlider.getWidth(), 18, juce::Justification::centred);
+        g.drawText("Time", timeSlider.getX() - 30, timeSlider.getBounds().getCentreY() - 10, 40, 20, juce::Justification::right);
     }
 
     void resized() override
     {
         resizedHeader();
-        mixSlider.setBounds(getWidth() / 2 - 50, 45, 100, 100);[cite: 3]
-        timeSlider.setBounds(getWidth() / 2 - 25, 175, 50, 50);[cite: 3]
-        beatButton.setBounds(getWidth() / 2 + 30, 185, 45, 28);[cite: 3]
+        mixSlider.setBounds(getWidth() / 2 - 50, 45, 100, 100);
+        timeSlider.setBounds(getWidth() / 2 - 25, 175, 50, 50);
+        beatButton.setBounds(getWidth() / 2 + 30, 185, 45, 28);
     }
 
 private:
@@ -136,7 +136,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mixAttach, timeAttach;
 };
 
-// --- Noise Gate Card[cite: 2] ---
+// --- Noise Gate Card ---
 class NoiseGateCard : public ModuleCardBase
 {
 public:
@@ -165,7 +165,7 @@ public:
 
     void paint(juce::Graphics& g) override
     {
-        g.fillAll(juce::Colour(0xFF0F0F0F));[cite: 2]
+        g.fillAll(juce::Colour(0xFF0F0F0F));
         paintHeader(g, juce::Colours::white);
 
         auto bounds = getLocalBounds();
@@ -200,18 +200,18 @@ public:
         g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
         g.drawText("Threshold  ↕", thresholdPillBounds, juce::Justification::centred);
 
-        g.drawText(juce::String(threshVal, 1) + " dB", scopeArea.getX() + 10, normalizedThresh - 22, 70, 20, juce::Justification::left);[cite: 2]
+        g.drawText(juce::String(threshVal, 1) + " dB", scopeArea.getX() + 10, normalizedThresh - 22, 70, 20, juce::Justification::left);
 
         g.setFont(juce::FontOptions(12.0f));
         g.setColour(juce::Colours::grey);
-        g.drawText("Attack", 20, getHeight() - 55, 100, 18, juce::Justification::left);[cite: 2]
+        g.drawText("Attack", 20, getHeight() - 55, 100, 18, juce::Justification::left);
         g.setColour(juce::Colours::white);
-        g.drawText(juce::String(static_cast<float>(attackSlider.getValue()), 0) + " ms", 20, getHeight() - 35, 100, 20, juce::Justification::left);[cite: 2]
+        g.drawText(juce::String(static_cast<float>(attackSlider.getValue()), 0) + " ms", 20, getHeight() - 35, 100, 20, juce::Justification::left);
 
         g.setColour(juce::Colours::grey);
-        g.drawText("Release", 150, getHeight() - 55, 100, 18, juce::Justification::left);[cite: 2]
+        g.drawText("Release", 150, getHeight() - 55, 100, 18, juce::Justification::left);
         g.setColour(juce::Colours::white);
-        g.drawText(juce::String(static_cast<float>(releaseSlider.getValue()), 0) + " ms", 150, getHeight() - 35, 100, 20, juce::Justification::left);[cite: 2]
+        g.drawText(juce::String(static_cast<float>(releaseSlider.getValue()), 0) + " ms", 150, getHeight() - 35, 100, 20, juce::Justification::left);
     }
 
     void resized() override
@@ -246,7 +246,7 @@ private:
     bool isDraggingPill = false;
 };
 
-// --- Chorus Card[cite: 1] ---
+// --- Chorus Card ---
 class ChorusCard : public ModuleCardBase
 {
 public:
@@ -280,29 +280,29 @@ public:
 
     void paint(juce::Graphics& g) override
     {
-        g.fillAll(juce::Colour(0xFF6B93AC));[cite: 1]
-        SeigaihaDrawer::drawPattern(g, getLocalBounds().toFloat(), juce::Colour(0xFF3B627C));[cite: 1]
+        g.fillAll(juce::Colour(0xFF6B93AC));
+        SeigaihaDrawer::drawPattern(g, getLocalBounds().toFloat(), juce::Colour(0xFF3B627C));
         paintHeader(g, juce::Colours::white);
 
         g.setColour(juce::Colours::white);
         g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
-        g.drawText("Depth", depthSlider.getX(), depthSlider.getBottom() + 4, depthSlider.getWidth(), 18, juce::Justification::centred);[cite: 1]
-        g.drawText("Amount", amountSlider.getX(), amountSlider.getBottom() + 4, amountSlider.getWidth(), 18, juce::Justification::centred);[cite: 1]
-        g.drawText("Speed", speedSlider.getX(), speedSlider.getBottom() + 4, speedSlider.getWidth(), 18, juce::Justification::centred);[cite: 1]
-        g.drawText("Bass", bassSlider.getX(), bassSlider.getBottom() + 4, bassSlider.getWidth(), 18, juce::Justification::centred);[cite: 1]
-        g.drawText("Treble", trebleSlider.getX(), trebleSlider.getBottom() + 4, trebleSlider.getWidth(), 18, juce::Justification::centred);[cite: 1]
+        g.drawText("Depth", depthSlider.getX(), depthSlider.getBottom() + 4, depthSlider.getWidth(), 18, juce::Justification::centred);
+        g.drawText("Amount", amountSlider.getX(), amountSlider.getBottom() + 4, amountSlider.getWidth(), 18, juce::Justification::centred);
+        g.drawText("Speed", speedSlider.getX(), speedSlider.getBottom() + 4, speedSlider.getWidth(), 18, juce::Justification::centred);
+        g.drawText("Bass", bassSlider.getX(), bassSlider.getBottom() + 4, bassSlider.getWidth(), 18, juce::Justification::centred);
+        g.drawText("Treble", trebleSlider.getX(), trebleSlider.getBottom() + 4, trebleSlider.getWidth(), 18, juce::Justification::centred);
     }
 
     void resized() override
     {
         resizedHeader();
-        depthSlider.setBounds(getWidth() / 4 - 32, 55, 64, 64);[cite: 1]
-        amountSlider.setBounds((getWidth() * 3) / 4 - 32, 55, 64, 64);[cite: 1]
+        depthSlider.setBounds(getWidth() / 4 - 32, 55, 64, 64);
+        amountSlider.setBounds((getWidth() * 3) / 4 - 32, 55, 64, 64);
 
         int third = getWidth() / 3;
-        speedSlider.setBounds(third / 2 - 28, 165, 56, 56);[cite: 1]
-        bassSlider.setBounds(third + third / 2 - 28, 165, 56, 56);[cite: 1]
-        trebleSlider.setBounds(third * 2 + third / 2 - 28, 165, 56, 56);[cite: 1]
+        speedSlider.setBounds(third / 2 - 28, 165, 56, 56);
+        bassSlider.setBounds(third + third / 2 - 28, 165, 56, 56);
+        trebleSlider.setBounds(third * 2 + third / 2 - 28, 165, 56, 56);
     }
 
 private:
