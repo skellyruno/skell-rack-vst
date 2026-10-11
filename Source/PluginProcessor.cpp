@@ -10,6 +10,11 @@ ModularFXAudioProcessor::ModularFXAudioProcessor()
     gateThreshParam = apvts.getRawParameterValue("GATE_THRESH");
     choDepthParam = apvts.getRawParameterValue("CHO_DEPTH");
     choSpeedParam = apvts.getRawParameterValue("CHO_SPEED");
+
+    moduleOrder[0].store(ID_Reverser);
+    moduleOrder[1].store(ID_NoiseGate);
+    moduleOrder[2].store(ID_Chorus);
+    moduleCount.store(3);
 }
 
 bool ModularFXAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -41,6 +46,27 @@ juce::AudioProcessorValueTreeState::ParameterLayout ModularFXAudioProcessor::cre
     return { params.begin(), params.end() };
 }
 
+void ModularFXAudioProcessor::updateModuleOrder(const std::vector<int>& newOrder)
+{
+    int count = std::min(static_cast<int>(newOrder.size()), 3);
+    for (int i = 0; i < count; ++i)
+    {
+        moduleOrder[i].store(newOrder[i], std::memory_order_relaxed);
+    }
+    moduleCount.store(count, std::memory_order_release);
+}
+
+std::vector<int> ModularFXAudioProcessor::getModuleOrder() const
+{
+    std::vector<int> currentOrder;
+    int count = moduleCount.load(std::memory_order_acquire);
+    for (int i = 0; i < count; ++i)
+    {
+        currentOrder.push_back(moduleOrder[i].load(std::memory_order_relaxed));
+    }
+    return currentOrder;
+}
+
 void ModularFXAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     reverser.prepareToPlay(sampleRate, samplesPerBlock);
@@ -63,9 +89,14 @@ void ModularFXAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
     float depth = choDepthParam ? choDepthParam->load() : 0.0f;
     float speed = choSpeedParam ? choSpeedParam->load() : 1.0f;
 
-    reverser.processBlock(buffer, mix);
-    noiseGate.processBlock(buffer, thresh);
-    chorus.processBlock(buffer, depth, speed);
+    int count = moduleCount.load(std::memory_order_acquire);
+    for (int i = 0; i < count; ++i)
+    {
+        int modId = moduleOrder[i].load(std::memory_order_relaxed);
+        if (modId == ID_Reverser) reverser.processBlock(buffer, mix);
+        else if (modId == ID_NoiseGate) noiseGate.processBlock(buffer, thresh);
+        else if (modId == ID_Chorus) chorus.processBlock(buffer, depth, speed);
+    }
 }
 
 juce::AudioProcessorEditor* ModularFXAudioProcessor::createEditor()
