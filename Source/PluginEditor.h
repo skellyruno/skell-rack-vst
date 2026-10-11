@@ -36,20 +36,17 @@ public:
 protected:
     void paintHeader(juce::Graphics& g, juce::Colour textColour)
     {
+        if (getWidth() <= 0 || getHeight() <= 0) return;
         g.setColour(textColour);
-        g.setFont(juce::FontOptions(15.0f, juce::Font::bold));
+        g.setFont(juce::Font(15.0f, juce::Font::bold));
         g.drawText(moduleTitle, 85, 6, 120, 24, juce::Justification::left);
 
-        // 4 Corner Drag Handles
         g.setColour(textColour.withAlpha(0.3f));
         int w = getWidth(), h = getHeight();
-        if (w > 20 && h > 20)
-        {
-            g.fillRect(3, 3, 6, 6);
-            g.fillRect(w - 9, 3, 6, 6);
-            g.fillRect(3, h - 9, 6, 6);
-            g.fillRect(w - 9, h - 9, 6, 6);
-        }
+        g.fillRect(3, 3, 6, 6);
+        g.fillRect(w - 9, 3, 6, 6);
+        g.fillRect(3, h - 9, 6, 6);
+        g.fillRect(w - 9, h - 9, 6, 6);
     }
 
     void resizedHeader()
@@ -111,11 +108,12 @@ public:
 
     void paint(juce::Graphics& g) override
     {
+        if (getWidth() <= 0 || getHeight() <= 0) return;
         g.fillAll(juce::Colour(0xFF121212));
         paintHeader(g, juce::Colours::white);
 
         g.setColour(juce::Colours::grey);
-        g.setFont(juce::FontOptions(13.0f));
+        g.setFont(juce::Font(13.0f));
         g.drawText("Mix", mixSlider.getX(), mixSlider.getBottom() + 4, mixSlider.getWidth(), 18, juce::Justification::centred);
         g.drawText("Time", timeSlider.getX() - 30, timeSlider.getBounds().getCentreY() - 10, 40, 20, juce::Justification::right);
     }
@@ -165,14 +163,18 @@ public:
 
     void paint(juce::Graphics& g) override
     {
+        if (getWidth() <= 0 || getHeight() <= 0) return;
         g.fillAll(juce::Colour(0xFF0F0F0F));
         paintHeader(g, juce::Colours::white);
 
         auto bounds = getLocalBounds();
         if (bounds.getHeight() < 180) return;
 
-        auto scopeArea = bounds.removeFromTop(180).removeFromBottom(130).toFloat();
-        if (scopeArea.getHeight() <= 0.0f) return;
+        // Safe explicit scope area calculation
+        juce::Rectangle<float> scopeArea(static_cast<float>(bounds.getX() + 15),
+                                         static_cast<float>(bounds.getY() + 45),
+                                         static_cast<float>(bounds.getWidth() - 30),
+                                         110.0f);
 
         g.setColour(juce::Colours::white.withAlpha(0.05f));
         g.drawRect(scopeArea);
@@ -197,12 +199,12 @@ public:
         g.fillRoundedRectangle(thresholdPillBounds, 14.0f);
         g.setColour(juce::Colours::white);
         g.drawRoundedRectangle(thresholdPillBounds, 14.0f, 1.2f);
-        g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
+        g.setFont(juce::Font(13.0f, juce::Font::bold));
         g.drawText("Threshold  ↕", thresholdPillBounds, juce::Justification::centred);
 
         g.drawText(juce::String(threshVal, 1) + " dB", static_cast<int>(scopeArea.getX() + 10), static_cast<int>(normalizedThresh - 22), 70, 20, juce::Justification::left);
 
-        g.setFont(juce::FontOptions(12.0f));
+        g.setFont(juce::Font(12.0f));
         g.setColour(juce::Colours::grey);
         g.drawText("Attack", 20, getHeight() - 55, 100, 18, juce::Justification::left);
         g.setColour(juce::Colours::white);
@@ -229,10 +231,7 @@ public:
         {
             auto bounds = getLocalBounds();
             if (bounds.getHeight() < 180) return;
-            auto scopeArea = bounds.removeFromTop(180).removeFromBottom(130).toFloat();
-            if (scopeArea.getHeight() <= 0.0f) return;
-
-            float norm = juce::jlimit(0.0f, 1.0f, (e.position.y - scopeArea.getY()) / scopeArea.getHeight());
+            float norm = juce::jlimit(0.0f, 1.0f, (e.position.y - (bounds.getY() + 45)) / 110.0f);
             threshSlider.setValue(juce::jmap(norm, 1.0f, 0.0f, -60.0f, 0.0f));
             repaint();
         }
@@ -280,12 +279,13 @@ public:
 
     void paint(juce::Graphics& g) override
     {
+        if (getWidth() <= 0 || getHeight() <= 0) return;
         g.fillAll(juce::Colour(0xFF6B93AC));
         SeigaihaDrawer::drawPattern(g, getLocalBounds().toFloat(), juce::Colour(0xFF3B627C));
         paintHeader(g, juce::Colours::white);
 
         g.setColour(juce::Colours::white);
-        g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
+        g.setFont(juce::Font(13.0f, juce::Font::bold));
         g.drawText("Depth", depthSlider.getX(), depthSlider.getBottom() + 4, depthSlider.getWidth(), 18, juce::Justification::centred);
         g.drawText("Amount", amountSlider.getX(), amountSlider.getBottom() + 4, amountSlider.getWidth(), 18, juce::Justification::centred);
         g.drawText("Speed", speedSlider.getX(), speedSlider.getBottom() + 4, speedSlider.getWidth(), 18, juce::Justification::centred);
