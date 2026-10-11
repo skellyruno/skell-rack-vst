@@ -1,22 +1,26 @@
 #include "PluginEditor.h"
 
 ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProcessor& p)
-    : AudioProcessorEditor(&p), audioProcessor(p),
-      reverserCard(p), noiseGateCard(p), chorusCard(p)
+    : AudioProcessorEditor(&p), audioProcessor(p)
 {
-    addAndMakeVisible(reverserCard);
-    addAndMakeVisible(noiseGateCard);
-    addAndMakeVisible(chorusCard);
+    reverserCard = std::make_unique<ReverserCard>(p);
+    noiseGateCard = std::make_unique<NoiseGateCard>(p);
+    chorusCard = std::make_unique<ChorusCard>(p);
 
-    addModuleBox.addItem("+ Add Reverser", ID_Reverser);
-    addModuleBox.addItem("+ Add Noise Gate", ID_NoiseGate);
-    addModuleBox.addItem("+ Add Chorus Ensemble", ID_Chorus);
+    addAndMakeVisible(*reverserCard);
+    addAndMakeVisible(*noiseGateCard);
+    addAndMakeVisible(*chorusCard);
+
+    addModuleBox = std::make_unique<juce::ComboBox>();
+    addModuleBox->addItem("+ Add Reverser", ID_Reverser);
+    addModuleBox->addItem("+ Add Noise Gate", ID_NoiseGate);
+    addModuleBox->addItem("+ Add Chorus Ensemble", ID_Chorus);
 
     juce::Component::SafePointer<ModularFXAudioProcessorEditor> safeThis(this);
-    addModuleBox.onChange = [safeThis] {
+    addModuleBox->onChange = [safeThis] {
         if (safeThis == nullptr) return;
 
-        int id = safeThis->addModuleBox.getSelectedId();
+        int id = safeThis->addModuleBox->getSelectedId();
         if (id <= 0) return;
 
         auto currentOrder = safeThis->audioProcessor.getModuleOrder();
@@ -29,13 +33,13 @@ ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProce
         juce::MessageManager::callAsync([safeThis]() {
             if (safeThis != nullptr)
             {
-                safeThis->addModuleBox.setSelectedId(0, juce::dontSendNotification);
+                safeThis->addModuleBox->setSelectedId(0, juce::dontSendNotification);
                 safeThis->resized();
                 safeThis->repaint();
             }
         });
     };
-    addAndMakeVisible(addModuleBox);
+    addAndMakeVisible(*addModuleBox);
 
     updateCardCallbacks();
     setSize(900, 340);
@@ -72,14 +76,14 @@ void ModularFXAudioProcessorEditor::updateCardCallbacks()
         safeThis->repaint();
     };
 
-    reverserCard.onMoveRequested = handleMove;
-    reverserCard.onRemoveRequested = handleRemove;
+    reverserCard->onMoveRequested = handleMove;
+    reverserCard->onRemoveRequested = handleRemove;
 
-    noiseGateCard.onMoveRequested = handleMove;
-    noiseGateCard.onRemoveRequested = handleRemove;
+    noiseGateCard->onMoveRequested = handleMove;
+    noiseGateCard->onRemoveRequested = handleRemove;
 
-    chorusCard.onMoveRequested = handleMove;
-    chorusCard.onRemoveRequested = handleRemove;
+    chorusCard->onMoveRequested = handleMove;
+    chorusCard->onRemoveRequested = handleRemove;
 }
 
 void ModularFXAudioProcessorEditor::paint(juce::Graphics& g)
@@ -93,14 +97,15 @@ void ModularFXAudioProcessorEditor::paint(juce::Graphics& g)
 
 void ModularFXAudioProcessorEditor::resized()
 {
-    addModuleBox.setBounds(getWidth() - 170, 10, 150, 24);
+    if (addModuleBox != nullptr)
+        addModuleBox->setBounds(getWidth() - 170, 10, 150, 24);
 
     auto rackArea = getLocalBounds().removeFromBottom(getHeight() - 45).reduced(10);
     auto currentOrder = audioProcessor.getModuleOrder();
 
-    reverserCard.setVisible(false);
-    noiseGateCard.setVisible(false);
-    chorusCard.setVisible(false);
+    if (reverserCard) reverserCard->setVisible(false);
+    if (noiseGateCard) noiseGateCard->setVisible(false);
+    if (chorusCard) chorusCard->setVisible(false);
 
     int numVisible = static_cast<int>(currentOrder.size());
     if (numVisible == 0) return;
@@ -110,9 +115,9 @@ void ModularFXAudioProcessorEditor::resized()
     for (int id : currentOrder)
     {
         ModuleCardBase* card = nullptr;
-        if (id == ID_Reverser) card = &reverserCard;
-        else if (id == ID_NoiseGate) card = &noiseGateCard;
-        else if (id == ID_Chorus) card = &chorusCard;
+        if (id == ID_Reverser) card = reverserCard.get();
+        else if (id == ID_NoiseGate) card = noiseGateCard.get();
+        else if (id == ID_Chorus) card = chorusCard.get();
 
         if (card != nullptr)
         {
