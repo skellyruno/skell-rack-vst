@@ -48,7 +48,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ModularFXAudioProcessor::cre
 
 void ModularFXAudioProcessor::updateModuleOrder(const std::vector<int>& newOrder)
 {
-    int count = std::min(static_cast<int>(newOrder.size()), 3);
+    int count = juce::jlimit(1, 3, static_cast<int>(newOrder.size()));
     for (int i = 0; i < count; ++i)
     {
         moduleOrder[i].store(newOrder[i], std::memory_order_relaxed);
