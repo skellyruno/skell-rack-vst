@@ -170,7 +170,6 @@ public:
         auto bounds = getLocalBounds();
         if (bounds.getHeight() < 180) return;
 
-        // Safe explicit scope area calculation
         juce::Rectangle<float> scopeArea(static_cast<float>(bounds.getX() + 15),
                                          static_cast<float>(bounds.getY() + 45),
                                          static_cast<float>(bounds.getWidth() - 30),
@@ -324,11 +323,11 @@ public:
 
 private:
     ModularFXAudioProcessor& audioProcessor;
-    juce::ComboBox addModuleBox;
+    std::unique_ptr<juce::ComboBox> addModuleBox;
 
-    ReverserCard reverserCard;
-    NoiseGateCard noiseGateCard;
-    ChorusCard chorusCard;
+    std::unique_ptr<ReverserCard> reverserCard;
+    std::unique_ptr<NoiseGateCard> noiseGateCard;
+    std::unique_ptr<ChorusCard> chorusCard;
 
     void updateCardCallbacks();
 };
