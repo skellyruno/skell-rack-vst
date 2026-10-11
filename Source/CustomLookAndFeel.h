@@ -8,9 +8,7 @@ public:
     {
         if (bounds.isEmpty() || bounds.getWidth() <= 0.0f || bounds.getHeight() <= 0.0f) return;
 
-        g.setColour(waveColor.withAlpha(0.2f));
-
-        // Optimized single-path batch rendering
+        g.setColour(waveColor.withAlpha(0.25f));
         juce::Path wavePattern;
         const float radius = 24.0f;
         const float startY = bounds.getBottom();
@@ -42,7 +40,7 @@ public:
         auto bounds = juce::Rectangle<float>(static_cast<float>(x),
                                             static_cast<float>(y),
                                             static_cast<float>(width),
-                                            static_cast<float>(height)).reduced(6.0f);
+                                            static_cast<float>(height)).reduced(4.0f);
         if (bounds.isEmpty()) return;
 
         auto center = bounds.getCentre();
@@ -90,7 +88,7 @@ public:
         auto bounds = juce::Rectangle<float>(static_cast<float>(x),
                                             static_cast<float>(y),
                                             static_cast<float>(width),
-                                            static_cast<float>(height)).reduced(8.0f);
+                                            static_cast<float>(height)).reduced(6.0f);
         if (bounds.isEmpty()) return;
 
         auto center = bounds.getCentre();
@@ -100,26 +98,22 @@ public:
         float pos = juce::jlimit(0.0f, 1.0f, sliderPosProportional);
         auto angle = rotaryStartAngle + pos * (rotaryEndAngle - rotaryStartAngle);
 
-        // Background Track Arc
         juce::Path trackPath;
-        trackPath.addCentredArc(center.x, center.y, radius + 3.0f, radius + 3.0f, 0.0f, rotaryStartAngle, rotaryEndAngle, true);
+        trackPath.addCentredArc(center.x, center.y, radius + 4.0f, radius + 4.0f, 0.0f, rotaryStartAngle, rotaryEndAngle, true);
         g.setColour(juce::Colours::white.withAlpha(0.15f));
         g.strokePath(trackPath, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
-        // Active Purple Arc
         if (angle > rotaryStartAngle + 0.01f)
         {
             juce::Path arcPath;
-            arcPath.addCentredArc(center.x, center.y, radius + 3.0f, radius + 3.0f, 0.0f, rotaryStartAngle, angle, true);
+            arcPath.addCentredArc(center.x, center.y, radius + 4.0f, radius + 4.0f, 0.0f, rotaryStartAngle, angle, true);
             g.setColour(juce::Colour(0xFFA020F0));
             g.strokePath(arcPath, juce::PathStrokeType(3.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
 
-        // White Knob Body
         g.setColour(juce::Colours::white);
         g.fillEllipse(bounds);
 
-        // Pointer Line
         juce::Path pointer;
         pointer.startNewSubPath(center);
         pointer.lineTo(center.x + std::sin(angle) * (radius * 0.65f),
