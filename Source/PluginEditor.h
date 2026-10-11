@@ -21,15 +21,11 @@ public:
 
         moveRightButton.setButtonText(">");
         addAndMakeVisible(moveRightButton);
-
-        removeButton.setButtonText("X");
-        addAndMakeVisible(removeButton);
     }
 
     virtual ~ModuleCardBase() override = default;
 
     std::function<void(int, int)> onMoveRequested;
-    std::function<void(int)> onRemoveRequested;
 
     int getModuleID() const { return moduleId; }
 
@@ -40,6 +36,7 @@ protected:
         g.setFont(juce::FontOptions(15.0f, juce::Font::bold));
         g.drawText(moduleTitle, 85, 6, 120, 24, juce::Justification::left);
 
+        // 4 Corner Drag Handles
         g.setColour(textColour.withAlpha(0.3f));
         int w = getWidth(), h = getHeight();
         if (w > 20 && h > 20)
@@ -55,22 +52,20 @@ protected:
     {
         bypassButton.setBounds(12, 6, 36, 22);
         infoButton.setBounds(52, 6, 22, 22);
-        moveLeftButton.setBounds(getWidth() - 80, 6, 22, 22);
-        moveRightButton.setBounds(getWidth() - 55, 6, 22, 22);
-        removeButton.setBounds(getWidth() - 30, 6, 22, 22);
+        moveLeftButton.setBounds(getWidth() - 55, 6, 22, 22);
+        moveRightButton.setBounds(getWidth() - 30, 6, 22, 22);
     }
 
     void setupHeaderCallbacks()
     {
         moveLeftButton.onClick = [this] { if (onMoveRequested) onMoveRequested(moduleId, -1); };
         moveRightButton.onClick = [this] { if (onMoveRequested) onMoveRequested(moduleId, 1); };
-        removeButton.onClick = [this] { if (onRemoveRequested) onRemoveRequested(moduleId); };
     }
 
     juce::String moduleTitle;
     int moduleId;
     juce::ToggleButton bypassButton;
-    juce::TextButton infoButton, moveLeftButton, moveRightButton, removeButton;
+    juce::TextButton infoButton, moveLeftButton, moveRightButton;
 };
 
 // --- Reverser Card ---
@@ -199,7 +194,6 @@ public:
         g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
         g.drawText("Threshold  ↕", thresholdPillBounds, juce::Justification::centred);
 
-        // Fixed C4244 warning by casting to int explicitly
         g.drawText(juce::String(threshVal, 1) + " dB", static_cast<int>(scopeArea.getX() + 10), static_cast<int>(normalizedThresh - 22), 70, 20, juce::Justification::left);
 
         g.setFont(juce::FontOptions(12.0f));
@@ -324,7 +318,6 @@ public:
 
 private:
     ModularFXAudioProcessor& audioProcessor;
-    juce::ComboBox addModuleBox;
 
     ReverserCard reverserCard;
     NoiseGateCard noiseGateCard;
