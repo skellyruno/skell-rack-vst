@@ -40,7 +40,6 @@ protected:
         g.setFont(juce::FontOptions(15.0f, juce::Font::bold));
         g.drawText(moduleTitle, 85, 6, 120, 24, juce::Justification::left);
 
-        // 4 Corner Drag Handles
         g.setColour(textColour.withAlpha(0.3f));
         int w = getWidth(), h = getHeight();
         if (w > 20 && h > 20)
@@ -200,7 +199,8 @@ public:
         g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
         g.drawText("Threshold  ↕", thresholdPillBounds, juce::Justification::centred);
 
-        g.drawText(juce::String(threshVal, 1) + " dB", scopeArea.getX() + 10, normalizedThresh - 22, 70, 20, juce::Justification::left);
+        // Fixed C4244 warning by casting to int explicitly
+        g.drawText(juce::String(threshVal, 1) + " dB", static_cast<int>(scopeArea.getX() + 10), static_cast<int>(normalizedThresh - 22), 70, 20, juce::Justification::left);
 
         g.setFont(juce::FontOptions(12.0f));
         g.setColour(juce::Colours::grey);
