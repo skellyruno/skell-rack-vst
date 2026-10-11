@@ -74,7 +74,7 @@ protected:
     juce::TextButton infoButton, moveLeftButton, moveRightButton, removeButton;
 };
 
-// --- Reverser Card ---
+// --- Reverser Card[cite: 3] ---
 class ReverserCard : public ModuleCardBase
 {
 public:
@@ -116,16 +116,16 @@ public:
 
         g.setColour(juce::Colours::grey);
         g.setFont(juce::FontOptions(13.0f));
-        g.drawText("Mix", mixSlider.getX(), mixSlider.getBottom() + 4, mixSlider.getWidth(), 18, juce::Justification::centred);
-        g.drawText("Time", timeSlider.getX() - 30, timeSlider.getBounds().getCentreY() - 10, 40, 20, juce::Justification::right);
+        g.drawText("Mix", mixSlider.getX(), mixSlider.getBottom() + 4, mixSlider.getWidth(), 18, juce::Justification::centred);[cite: 3]
+        g.drawText("Time", timeSlider.getX() - 30, timeSlider.getBounds().getCentreY() - 10, 40, 20, juce::Justification::right);[cite: 3]
     }
 
     void resized() override
     {
         resizedHeader();
-        mixSlider.setBounds(getWidth() / 2 - 50, 45, 100, 100);
-        timeSlider.setBounds(getWidth() / 2 - 25, 175, 50, 50);
-        beatButton.setBounds(getWidth() / 2 + 30, 185, 45, 28);
+        mixSlider.setBounds(getWidth() / 2 - 50, 45, 100, 100);[cite: 3]
+        timeSlider.setBounds(getWidth() / 2 - 25, 175, 50, 50);[cite: 3]
+        beatButton.setBounds(getWidth() / 2 + 30, 185, 45, 28);[cite: 3]
     }
 
 private:
@@ -136,7 +136,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mixAttach, timeAttach;
 };
 
-// --- Noise Gate Card ---
+// --- Noise Gate Card[cite: 2] ---
 class NoiseGateCard : public ModuleCardBase
 {
 public:
@@ -204,12 +204,12 @@ public:
 
         g.setFont(juce::FontOptions(12.0f));
         g.setColour(juce::Colours::grey);
-        g.drawText("Attack", 20, getHeight() - 55, 100, 18, juce::Justification::left);
+        g.drawText("Attack", 20, getHeight() - 55, 100, 18, juce::Justification::left);[cite: 2]
         g.setColour(juce::Colours::white);
         g.drawText(juce::String(static_cast<float>(attackSlider.getValue()), 0) + " ms", 20, getHeight() - 35, 100, 20, juce::Justification::left);[cite: 2]
 
         g.setColour(juce::Colours::grey);
-        g.drawText("Release", 150, getHeight() - 55, 100, 18, juce::Justification::left);
+        g.drawText("Release", 150, getHeight() - 55, 100, 18, juce::Justification::left);[cite: 2]
         g.setColour(juce::Colours::white);
         g.drawText(juce::String(static_cast<float>(releaseSlider.getValue()), 0) + " ms", 150, getHeight() - 35, 100, 20, juce::Justification::left);[cite: 2]
     }
@@ -246,7 +246,7 @@ private:
     bool isDraggingPill = false;
 };
 
-// --- Chorus Card ---
+// --- Chorus Card[cite: 1] ---
 class ChorusCard : public ModuleCardBase
 {
 public:
@@ -296,13 +296,13 @@ public:
     void resized() override
     {
         resizedHeader();
-        depthSlider.setBounds(getWidth() / 4 - 32, 55, 64, 64);
-        amountSlider.setBounds((getWidth() * 3) / 4 - 32, 55, 64, 64);
+        depthSlider.setBounds(getWidth() / 4 - 32, 55, 64, 64);[cite: 1]
+        amountSlider.setBounds((getWidth() * 3) / 4 - 32, 55, 64, 64);[cite: 1]
 
         int third = getWidth() / 3;
-        speedSlider.setBounds(third / 2 - 28, 165, 56, 56);
-        bassSlider.setBounds(third + third / 2 - 28, 165, 56, 56);
-        trebleSlider.setBounds(third * 2 + third / 2 - 28, 165, 56, 56);
+        speedSlider.setBounds(third / 2 - 28, 165, 56, 56);[cite: 1]
+        bassSlider.setBounds(third + third / 2 - 28, 165, 56, 56);[cite: 1]
+        trebleSlider.setBounds(third * 2 + third / 2 - 28, 165, 56, 56);[cite: 1]
     }
 
 private:
