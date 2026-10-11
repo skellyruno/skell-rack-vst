@@ -11,21 +11,28 @@ ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProce
     addModuleBox.addItem("+ Add Reverser", ID_Reverser);
     addModuleBox.addItem("+ Add Noise Gate", ID_NoiseGate);
     addModuleBox.addItem("+ Add Chorus Ensemble", ID_Chorus);
-    addModuleBox.onChange = [this] {
-        int id = addModuleBox.getSelectedId();
+
+    juce::Component::SafePointer<ModularFXAudioProcessorEditor> safeThis(this);
+    addModuleBox.onChange = [safeThis] {
+        if (safeThis == nullptr) return;
+
+        int id = safeThis->addModuleBox.getSelectedId();
         if (id <= 0) return;
 
-        auto currentOrder = audioProcessor.getModuleOrder();
+        auto currentOrder = safeThis->audioProcessor.getModuleOrder();
         if (std::find(currentOrder.begin(), currentOrder.end(), id) == currentOrder.end())
         {
             currentOrder.push_back(id);
-            audioProcessor.updateModuleOrder(currentOrder);
+            safeThis->audioProcessor.updateModuleOrder(currentOrder);
         }
 
-        juce::MessageManager::callAsync([this]() {
-            addModuleBox.setSelectedId(0, juce::dontSendNotification);
-            resized();
-            repaint();
+        juce::MessageManager::callAsync([safeThis]() {
+            if (safeThis != nullptr)
+            {
+                safeThis->addModuleBox.setSelectedId(0, juce::dontSendNotification);
+                safeThis->resized();
+                safeThis->repaint();
+            }
         });
     };
     addAndMakeVisible(addModuleBox);
@@ -36,8 +43,11 @@ ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProce
 
 void ModularFXAudioProcessorEditor::updateCardCallbacks()
 {
-    auto handleMove = [this](int id, int direction) {
-        auto order = audioProcessor.getModuleOrder();
+    juce::Component::SafePointer<ModularFXAudioProcessorEditor> safeThis(this);
+
+    auto handleMove = [safeThis](int id, int direction) {
+        if (safeThis == nullptr) return;
+        auto order = safeThis->audioProcessor.getModuleOrder();
         auto it = std::find(order.begin(), order.end(), id);
         if (it != order.end())
         {
@@ -46,19 +56,20 @@ void ModularFXAudioProcessorEditor::updateCardCallbacks()
             if (newIdx >= 0 && newIdx < static_cast<int>(order.size()))
             {
                 std::swap(order[idx], order[newIdx]);
-                audioProcessor.updateModuleOrder(order);
-                resized();
-                repaint();
+                safeThis->audioProcessor.updateModuleOrder(order);
+                safeThis->resized();
+                safeThis->repaint();
             }
         }
     };
 
-    auto handleRemove = [this](int id) {
-        auto order = audioProcessor.getModuleOrder();
+    auto handleRemove = [safeThis](int id) {
+        if (safeThis == nullptr) return;
+        auto order = safeThis->audioProcessor.getModuleOrder();
         order.erase(std::remove(order.begin(), order.end(), id), order.end());
-        audioProcessor.updateModuleOrder(order);
-        resized();
-        repaint();
+        safeThis->audioProcessor.updateModuleOrder(order);
+        safeThis->resized();
+        safeThis->repaint();
     };
 
     reverserCard.onMoveRequested = handleMove;
@@ -73,9 +84,10 @@ void ModularFXAudioProcessorEditor::updateCardCallbacks()
 
 void ModularFXAudioProcessorEditor::paint(juce::Graphics& g)
 {
+    if (getWidth() <= 0 || getHeight() <= 0) return;
     g.fillAll(juce::Colour(0xFF1E1E1E));
     g.setColour(juce::Colours::white);
-    g.setFont(juce::FontOptions(18.0f, juce::Font::bold));
+    g.setFont(juce::Font(18.0f, juce::Font::bold));
     g.drawText("Modular FX Suite", 16, 10, 200, 30, juce::Justification::centredLeft);
 }
 
@@ -86,7 +98,6 @@ void ModularFXAudioProcessorEditor::resized()
     auto rackArea = getLocalBounds().removeFromBottom(getHeight() - 45).reduced(10);
     auto currentOrder = audioProcessor.getModuleOrder();
 
-    // Explicitly manage visibility to prevent overlap crashes in FL Studio
     reverserCard.setVisible(false);
     noiseGateCard.setVisible(false);
     chorusCard.setVisible(false);
