@@ -21,11 +21,15 @@ public:
 
         moveRightButton.setButtonText(">");
         addAndMakeVisible(moveRightButton);
+
+        removeButton.setButtonText("X");
+        addAndMakeVisible(removeButton);
     }
 
     virtual ~ModuleCardBase() override = default;
 
     std::function<void(int, int)> onMoveRequested;
+    std::function<void(int)> onRemoveRequested;
 
     int getModuleID() const { return moduleId; }
 
@@ -52,20 +56,22 @@ protected:
     {
         bypassButton.setBounds(12, 6, 36, 22);
         infoButton.setBounds(52, 6, 22, 22);
-        moveLeftButton.setBounds(getWidth() - 55, 6, 22, 22);
-        moveRightButton.setBounds(getWidth() - 30, 6, 22, 22);
+        moveLeftButton.setBounds(getWidth() - 80, 6, 22, 22);
+        moveRightButton.setBounds(getWidth() - 55, 6, 22, 22);
+        removeButton.setBounds(getWidth() - 30, 6, 22, 22);
     }
 
     void setupHeaderCallbacks()
     {
         moveLeftButton.onClick = [this] { if (onMoveRequested) onMoveRequested(moduleId, -1); };
         moveRightButton.onClick = [this] { if (onMoveRequested) onMoveRequested(moduleId, 1); };
+        removeButton.onClick = [this] { if (onRemoveRequested) onRemoveRequested(moduleId); };
     }
 
     juce::String moduleTitle;
     int moduleId;
     juce::ToggleButton bypassButton;
-    juce::TextButton infoButton, moveLeftButton, moveRightButton;
+    juce::TextButton infoButton, moveLeftButton, moveRightButton, removeButton;
 };
 
 // --- Reverser Card ---
@@ -318,6 +324,7 @@ public:
 
 private:
     ModularFXAudioProcessor& audioProcessor;
+    juce::ComboBox addModuleBox;
 
     ReverserCard reverserCard;
     NoiseGateCard noiseGateCard;
