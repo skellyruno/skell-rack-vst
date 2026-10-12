@@ -196,8 +196,11 @@ public:
 
         float threshVal = static_cast<float>(threshSlider.getValue());
         float normalizedThresh = juce::jmap(threshVal, -60.0f, 0.0f, scopeArea.getBottom(), scopeArea.getY());
+        
+        // Fixed: Provide valid dash array instead of nullptr to prevent null pointer dereference segfault on load
+        const float dashes[] = { 4.0f, 4.0f };
         g.setColour(juce::Colours::white.withAlpha(0.6f));
-        g.drawDashedLine(juce::Line<float>(scopeArea.getX(), normalizedThresh, scopeArea.getRight(), normalizedThresh), nullptr, 0, 2);
+        g.drawDashedLine(juce::Line<float>(scopeArea.getX(), normalizedThresh, scopeArea.getRight(), normalizedThresh), dashes, 2, 1.0f);
 
         thresholdPillBounds = juce::Rectangle<float>(scopeArea.getCentreX() - 55.0f, normalizedThresh - 14.0f, 110.0f, 28.0f);
         g.setColour(juce::Colour(0xFF1E1E1E));
