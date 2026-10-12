@@ -25,7 +25,8 @@ bool ModularFXAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts)
     if (mainOutput != juce::AudioChannelSet::mono() && mainOutput != juce::AudioChannelSet::stereo())
         return false;
 
-    return mainInput == mainOutput;
+    // Fixed: allow disabled input buses (e.g., synth/generator or sidechain configs)
+    return mainOutput == mainInput || mainInput.isDisabled();
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout ModularFXAudioProcessor::createParameterLayout()
@@ -48,7 +49,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout ModularFXAudioProcessor::cre
 
 void ModularFXAudioProcessor::updateModuleOrder(const std::vector<int>& newOrder)
 {
-    int count = juce::jlimit(1, 3, static_cast<int>(newOrder.size()));
+    // Fixed: safe bounds check preventing out-of-bounds read when vector is empty
+    int count = juce::jmin(3, static_cast<int>(newOrder.size()));
     for (int i = 0; i < count; ++i)
     {
         moduleOrder[i].store(newOrder[i], std::memory_order_relaxed);
