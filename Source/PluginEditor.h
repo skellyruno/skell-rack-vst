@@ -102,6 +102,7 @@ public:
 
     ~ReverserCard() override
     {
+        removeAllChildren();
         mixSlider.setLookAndFeel(nullptr);
         timeSlider.setLookAndFeel(nullptr);
     }
@@ -159,6 +160,11 @@ public:
         threshAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(p.apvts, "GATE_THRESH", threshSlider);
 
         bypassButton.onClick = [this] { processor.noiseGate.setBypassed(!bypassButton.getToggleState()); };
+    }
+
+    ~NoiseGateCard() override
+    {
+        removeAllChildren();
     }
 
     void paint(juce::Graphics& g) override
@@ -272,6 +278,7 @@ public:
 
     ~ChorusCard() override
     {
+        removeAllChildren();
         depthSlider.setLookAndFeel(nullptr); amountSlider.setLookAndFeel(nullptr);
         speedSlider.setLookAndFeel(nullptr); bassSlider.setLookAndFeel(nullptr); trebleSlider.setLookAndFeel(nullptr);
     }
@@ -316,18 +323,18 @@ class ModularFXAudioProcessorEditor : public juce::AudioProcessorEditor
 {
 public:
     ModularFXAudioProcessorEditor(ModularFXAudioProcessor& p);
-    ~ModularFXAudioProcessorEditor() override = default;
+    ~ModularFXAudioProcessorEditor() override;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
 
 private:
     ModularFXAudioProcessor& audioProcessor;
-    std::unique_ptr<juce::ComboBox> addModuleBox;
+    juce::ComboBox addModuleBox;
 
-    std::unique_ptr<ReverserCard> reverserCard;
-    std::unique_ptr<NoiseGateCard> noiseGateCard;
-    std::unique_ptr<ChorusCard> chorusCard;
+    ReverserCard reverserCard;
+    NoiseGateCard noiseGateCard;
+    ChorusCard chorusCard;
 
     void updateCardCallbacks();
 };
