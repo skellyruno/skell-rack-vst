@@ -1,0 +1,365 @@
+#pragma once
+#include <JuceHeader.h>
+#include <vector>
+
+// Single source of truth for every effect in the rack:
+// its ID, name, colours, and its parameters.  The processor builds the APVTS
+// layout from this table and the editor builds the knobs from it.
+
+enum ModuleID : int
+{
+    ID_None = 0,
+    ID_Reverser,        // 1  (IDs 1-3 are unchanged from the first version)
+    ID_NoiseGate,       // 2
+    ID_Chorus,          // 3
+    ID_VisualEQ,
+    ID_Compressor,
+    ID_MultiBand,
+    ID_Limiter,
+    ID_VocalVerb,
+    ID_Shimmer,
+    ID_Reverb,
+    ID_Delay,
+    ID_BitBandit,
+    ID_Gater,
+    ID_Shaper,
+    ID_Flanger,
+    ID_Phaser,
+    ID_Tremolo,
+    ID_Distortion,
+    ID_OneKnob,
+    ID_NumModules
+};
+
+constexpr int kMaxModules = ID_NumModules - 1;   // number of different effects that exist
+constexpr int kMaxRack = 10;                     // how many can be stacked at once (same limit as BandLab)
+constexpr int kSlotParams = 8;                   // generic controls per rack slot (no effect needs more than 8)
+
+enum class ParamKind   { Knob, Toggle, Choice };
+enum class DisplayKind { None, EqCurve, GainReduction };
+
+struct ParamSpec
+{
+    juce::String id, label, unit;
+    ParamKind kind = ParamKind::Knob;
+    float minV = 0.0f, maxV = 1.0f, defV = 0.0f;
+    float step = 0.0f;           // 0 = continuous
+    float skewCentre = 0.0f;     // 0 = linear
+    float scale = 1.0f;          // display multiplier (100 turns 0..1 into %)
+    int   decimals = 2;
+    juce::StringArray choices;
+    juce::String dependsOn;      // id of a toggle that must be in `dependsValue` for this control to be active
+    bool  dependsValue = true;
+};
+
+struct FxInfo
+{
+    int          id = ID_None;
+    juce::String name, prefix, blurb;
+    juce::Colour bg, accent, text;
+    DisplayKind  display = DisplayKind::None;
+    bool         customCard = false;     // drawn by a hand-built card in PluginEditor.h
+    std::vector<ParamSpec> params;
+
+    juce::String onId() const { return prefix + "_ON"; }
+};
+
+namespace fxreg
+{
+    inline ParamSpec K (const char* id, const char* label, float mn, float mx, float def,
+                        const char* unit = "", int dec = 2, float skewCentre = 0.0f, float scale = 1.0f, float step = 0.0f)
+    {
+        ParamSpec s;
+        s.id = id; s.label = label; s.unit = unit; s.kind = ParamKind::Knob;
+        s.minV = mn; s.maxV = mx; s.defV = def; s.decimals = dec; s.skewCentre = skewCentre; s.scale = scale; s.step = step;
+        return s;
+    }
+    inline ParamSpec Pct (const char* id, const char* label, float def)
+    {
+        return K (id, label, 0.0f, 1.0f, def, "%", 0, 0.0f, 100.0f);
+    }
+    inline ParamSpec T (const char* id, const char* label, bool def)
+    {
+        ParamSpec s;
+        s.id = id; s.label = label; s.kind = ParamKind::Toggle; s.defV = def ? 1.0f : 0.0f; s.maxV = 1.0f;
+        return s;
+    }
+    inline ParamSpec C (const char* id, const char* label, const juce::StringArray& choices, int def)
+    {
+        ParamSpec s;
+        s.id = id; s.label = label; s.kind = ParamKind::Choice; s.choices = choices; s.defV = (float) def;
+        s.maxV = (float) (choices.size() - 1);
+        return s;
+    }
+    inline ParamSpec dep (ParamSpec s, const char* toggleId, bool value)
+    {
+        s.dependsOn = toggleId; s.dependsValue = value;
+        return s;
+    }
+}
+
+inline const std::vector<FxInfo>& getFxRegistry()
+{
+    using namespace fxreg;
+    using juce::Colour;
+    using juce::StringArray;
+
+    static const std::vector<FxInfo> registry = []
+    {
+        std::vector<FxInfo> r;
+        auto add = [&r] (int id, const char* name, const char* prefix, const char* blurb,
+                         juce::uint32 bg, juce::uint32 accent, DisplayKind display, bool custom,
+                         std::vector<ParamSpec> params)
+        {
+            FxInfo f;
+            f.id = id; f.name = name; f.prefix = prefix; f.blurb = blurb;
+            f.bg = Colour (bg); f.accent = Colour (accent); f.text = juce::Colours::white;
+            f.display = display; f.customCard = custom; f.params = std::move (params);
+            r.push_back (std::move (f));
+        };
+
+        // ------------------------------------------------------------ original three (custom cards)
+        add (ID_Reverser, "Reverser", "REV",
+             "Records short grains of audio and plays each one back backwards. Turn on Beat to lock the grain length to the project tempo.",
+             0xFF121212, 0xFFA020F0, DisplayKind::None, true,
+             { Pct ("REV_MIX", "Mix", 0.5f),
+               K ("REV_TIME", "Time", 0.0f, 1.0f, 0.55f, "", 2),
+               T ("REV_BEAT", "Beat", false) });
+
+        add (ID_NoiseGate, "Noise Gate", "GATE",
+             "Silences the signal when it drops below the threshold. Drag the Threshold pill up and down. Attack and release shape how fast the gate opens and closes.",
+             0xFF0F0F0F, 0xFFFFB703, DisplayKind::None, true,
+             { K ("GATE_THRESH", "Threshold", -60.0f, 0.0f, -30.0f, "dB", 1),
+               K ("GATE_ATTACK", "Attack", 1.0f, 100.0f, 37.0f, "ms", 0),
+               K ("GATE_RELEASE", "Release", 10.0f, 1000.0f, 200.0f, "ms", 0, 150.0f) });
+
+        add (ID_Chorus, "Chorus Ensemble", "CHO",
+             "Three detuned, modulated voices spread across the stereo field for a lush ensemble sound. Bass and Treble shape the chorus signal only.",
+             0xFF6B93AC, 0xFFFFFFFF, DisplayKind::None, true,
+             { Pct ("CHO_DEPTH", "Depth", 0.6f),
+               Pct ("CHO_AMOUNT", "Amount", 0.5f),
+               K ("CHO_SPEED", "Speed", 0.1f, 5.0f, 1.2f, "Hz", 2, 1.0f),
+               K ("CHO_BASS", "Bass", -12.0f, 12.0f, 0.0f, "dB", 1),
+               K ("CHO_TREBLE", "Treble", -12.0f, 12.0f, 0.0f, "dB", 1) });
+
+        // ------------------------------------------------------------ new effects (generic cards)
+        add (ID_VisualEQ, "Visual EQ", "EQ",
+             "Three-band equaliser with a high-pass filter. The curve above shows exactly what you are doing to the sound.",
+             0xFF14202B, 0xFF4CC9F0, DisplayKind::EqCurve, false,
+             { K ("EQ_HPF", "HPF", 20.0f, 500.0f, 20.0f, "Hz", 0, 80.0f),
+               K ("EQ_LF", "Low Freq", 30.0f, 400.0f, 100.0f, "Hz", 0, 100.0f),
+               K ("EQ_LG", "Low Gain", -15.0f, 15.0f, 0.0f, "dB", 1),
+               K ("EQ_MF", "Mid Freq", 200.0f, 8000.0f, 1000.0f, "Hz", 0, 1200.0f),
+               K ("EQ_MG", "Mid Gain", -15.0f, 15.0f, 0.0f, "dB", 1),
+               K ("EQ_MQ", "Mid Q", 0.3f, 6.0f, 1.0f, "", 2, 1.0f),
+               K ("EQ_HF", "High Freq", 2000.0f, 16000.0f, 8000.0f, "Hz", 0, 5600.0f),
+               K ("EQ_HG", "High Gain", -15.0f, 15.0f, 0.0f, "dB", 1) });
+
+        add (ID_Compressor, "Compressor", "COMP",
+             "Turns down loud parts so the level evens out. The bar shows how much gain is being removed. Use Makeup to bring the level back up, and Mix for parallel compression.",
+             0xFF1B1B22, 0xFFFF6B6B, DisplayKind::GainReduction, false,
+             { K ("COMP_THRESH", "Threshold", -60.0f, 0.0f, -18.0f, "dB", 1),
+               K ("COMP_RATIO", "Ratio", 1.0f, 20.0f, 4.0f, ": 1", 1, 4.0f),
+               K ("COMP_ATTACK", "Attack", 0.1f, 100.0f, 10.0f, "ms", 1, 10.0f),
+               K ("COMP_RELEASE", "Release", 10.0f, 1000.0f, 120.0f, "ms", 0, 150.0f),
+               K ("COMP_MAKEUP", "Makeup", 0.0f, 24.0f, 0.0f, "dB", 1),
+               Pct ("COMP_MIX", "Mix", 1.0f) });
+
+        add (ID_MultiBand, "Multi-Band Comp", "MB",
+             "Splits the sound into low, mid and high bands and compresses each on its own, so you can tighten the lows without squashing the highs.",
+             0xFF1E1B2E, 0xFFB388FF, DisplayKind::GainReduction, false,
+             { K ("MB_XLOW", "Low X-over", 60.0f, 400.0f, 150.0f, "Hz", 0, 150.0f),
+               K ("MB_XHIGH", "High X-over", 1000.0f, 8000.0f, 2500.0f, "Hz", 0, 2500.0f),
+               K ("MB_LTHR", "Low Thresh", -60.0f, 0.0f, -20.0f, "dB", 1),
+               K ("MB_MTHR", "Mid Thresh", -60.0f, 0.0f, -20.0f, "dB", 1),
+               K ("MB_HTHR", "High Thresh", -60.0f, 0.0f, -20.0f, "dB", 1),
+               K ("MB_RATIO", "Ratio", 1.0f, 10.0f, 3.0f, ": 1", 1, 3.0f),
+               K ("MB_GAIN", "Output", -12.0f, 12.0f, 0.0f, "dB", 1) });
+
+        add (ID_Limiter, "Clean Limiter", "LIM",
+             "A transparent peak limiter. Push Gain to make things louder, the Ceiling is the level nothing will ever go above.",
+             0xFF10261F, 0xFF3DDC97, DisplayKind::GainReduction, false,
+             { K ("LIM_GAIN", "Gain", 0.0f, 24.0f, 0.0f, "dB", 1),
+               K ("LIM_CEIL", "Ceiling", -12.0f, 0.0f, -0.3f, "dB", 1),
+               K ("LIM_REL", "Release", 10.0f, 1000.0f, 100.0f, "ms", 0, 100.0f) });
+
+        add (ID_VocalVerb, "Vocal Verb", "VV",
+             "A clean reverb that ducks while you sing and blooms back in the gaps, so vocals stay clear and upfront.",
+             0xFF2A1B33, 0xFFFF8FD8, DisplayKind::None, false,
+             { Pct ("VV_MIX", "Mix", 0.25f),
+               Pct ("VV_REFLECT", "Reflect", 0.5f),
+               dep (K ("VV_THRESH", "Threshold", -60.0f, 0.0f, -30.0f, "dB", 1), "VV_DUCK", true),
+               dep (Pct ("VV_AMOUNT", "Amount", 0.6f), "VV_DUCK", true),
+               T ("VV_DUCK", "Ducking", true) });
+
+        add (ID_Shimmer, "Shimmer", "SH",
+             "A spacious reverb that feeds an octave-up shifted copy of its own tail back into itself, giving a floating, ethereal glow.",
+             0xFF1A2540, 0xFF9AD1FF, DisplayKind::None, false,
+             { Pct ("SH_MIX", "Mix", 0.35f),
+               Pct ("SH_MOD", "Modulation", 0.3f),
+               Pct ("SH_TAIL", "Tail", 0.6f),
+               Pct ("SH_DIFF", "Diffusion", 0.6f) });
+
+        add (ID_Reverb, "Reverb", "RV",
+             "Adds space. Size sets how long the room rings, Damping removes the highs from the tail, and Pre-delay keeps the dry sound clear of the reverb.",
+             0xFF16282E, 0xFF5EEAD4, DisplayKind::None, false,
+             { Pct ("RV_MIX", "Mix", 0.3f),
+               Pct ("RV_SIZE", "Size", 0.5f),
+               Pct ("RV_DAMP", "Damping", 0.5f),
+               Pct ("RV_WIDTH", "Width", 1.0f),
+               K ("RV_PRE", "Pre-delay", 0.0f, 200.0f, 15.0f, "ms", 0) });
+
+        add (ID_Delay, "Delay", "DLY",
+             "Echoes. Free-time in milliseconds, or Sync to lock the echoes to the project tempo. Ping-Pong bounces them between left and right.",
+             0xFF2B2415, 0xFFFFC857, DisplayKind::None, false,
+             { dep (K ("DLY_TIME", "Time", 1.0f, 2000.0f, 350.0f, "ms", 0, 300.0f), "DLY_SYNC", false),
+               dep (C ("DLY_DIV", "Note", StringArray { "1/4", "1/8", "1/16", "1/4 dotted", "1/8 dotted", "1/8 triplet", "1/2" }, 1), "DLY_SYNC", true),
+               Pct ("DLY_FB", "Feedback", 0.4f),
+               Pct ("DLY_TONE", "Tone", 0.6f),
+               Pct ("DLY_MIX", "Mix", 0.3f),
+               T ("DLY_SYNC", "Sync", false),
+               T ("DLY_PING", "Ping-Pong", false) });
+
+        add (ID_BitBandit, "Bit Bandit", "BIT",
+             "Lo-fi crunch. Lower the bit depth and the sample rate for retro game sounds, robot voices and telephone tones.",
+             0xFF0D1F0D, 0xFF7CFF4F, DisplayKind::None, false,
+             { K ("BIT_BITS", "Bit Depth", 1.0f, 16.0f, 8.0f, "bit", 0, 0.0f, 1.0f, 1.0f),
+               K ("BIT_RATE", "Sample Rate", 1000.0f, 44100.0f, 12000.0f, "Hz", 0, 8000.0f),
+               Pct ("BIT_MIX", "Mix", 1.0f) });
+
+        add (ID_Gater, "Gater", "GTR",
+             "Chops the sound on and off in time with the tempo for rhythmic stutters. Depth sets how far the volume drops, Smooth softens the edges.",
+             0xFF2A1515, 0xFFF43F5E, DisplayKind::None, false,
+             { C ("GTR_TIME", "Time", StringArray { "1 bar", "1/2", "1/4", "1/8", "1/16", "1/32", "1/8 triplet", "1/16 triplet" }, 3),
+               Pct ("GTR_DEPTH", "Depth", 1.0f),
+               Pct ("GTR_SMOOTH", "Smooth", 0.2f) });
+
+        add (ID_Shaper, "Shaper", "SHP",
+             "Controls the attack and the tail of a sound. Boost Transient for punch, boost Sustain to lengthen decays, or turn either down to soften things.",
+             0xFF202428, 0xFFFFD166, DisplayKind::None, false,
+             { K ("SHP_TRANS", "Transient", -100.0f, 100.0f, 0.0f, "%", 0),
+               K ("SHP_SUST", "Sustain", -100.0f, 100.0f, 0.0f, "%", 0),
+               K ("SHP_OUT", "Output", -12.0f, 12.0f, 0.0f, "dB", 1) });
+
+        add (ID_Flanger, "Flanger", "FLG",
+             "A short, swept delay mixed with the dry sound for the classic jet-plane whoosh. Negative feedback gives a hollower sound.",
+             0xFF0F2B2B, 0xFF2DD4BF, DisplayKind::None, false,
+             { K ("FLG_RATE", "Rate", 0.05f, 5.0f, 0.3f, "Hz", 2, 0.5f),
+               Pct ("FLG_DEPTH", "Depth", 0.7f),
+               K ("FLG_FB", "Feedback", -0.95f, 0.95f, 0.5f, "%", 0, 0.0f, 100.0f),
+               Pct ("FLG_MIX", "Mix", 0.5f) });
+
+        add (ID_Phaser, "Phaser", "PHS",
+             "Sweeps a set of notches through the sound for a swirling, watery movement. More stages give a deeper, more complex swirl.",
+             0xFF2B1535, 0xFFE879F9, DisplayKind::None, false,
+             { K ("PHS_RATE", "Rate", 0.05f, 5.0f, 0.4f, "Hz", 2, 0.5f),
+               Pct ("PHS_DEPTH", "Depth", 0.7f),
+               K ("PHS_FB", "Feedback", 0.0f, 0.9f, 0.4f, "%", 0, 0.0f, 100.0f),
+               Pct ("PHS_MIX", "Mix", 0.5f),
+               C ("PHS_STAGES", "Stages", StringArray { "4 stages", "6 stages", "8 stages" }, 1) });
+
+        add (ID_Tremolo, "Tremolo", "TRM",
+             "Wobbles the volume. Switch on Auto-Pan to move the sound left and right instead (stereo only).",
+             0xFF2B1A12, 0xFFFB923C, DisplayKind::None, false,
+             { K ("TRM_RATE", "Rate", 0.1f, 20.0f, 5.0f, "Hz", 2, 3.0f),
+               Pct ("TRM_DEPTH", "Depth", 0.6f),
+               C ("TRM_SHAPE", "Shape", StringArray { "Sine", "Triangle", "Square" }, 0),
+               T ("TRM_PAN", "Auto-Pan", false) });
+
+        add (ID_Distortion, "Distortion", "DST",
+             "Adds grit. Overdrive is warm and smooth, Distortion is harder, and Fuzz is gated and spitty. Tone rolls off the harshness.",
+             0xFF2B0F0F, 0xFFEF4444, DisplayKind::None, false,
+             { C ("DST_MODE", "Type", StringArray { "Overdrive", "Distortion", "Fuzz" }, 0),
+               Pct ("DST_DRIVE", "Drive", 0.4f),
+               Pct ("DST_TONE", "Tone", 0.6f),
+               K ("DST_LEVEL", "Level", -24.0f, 6.0f, -6.0f, "dB", 1),
+               Pct ("DST_MIX", "Mix", 1.0f) });
+
+        add (ID_OneKnob, "One Knobs", "ONE",
+             "One knob, eight flavours. Pick a character, then turn Amount up until it sounds right.",
+             0xFF2A2A2A, 0xFFFFFFFF, DisplayKind::None, false,
+             { Pct ("ONE_AMT", "Amount", 0.5f),
+               C ("ONE_MODE", "Style", StringArray { "Brighter", "Echo", "Punchy", "Room", "Toasty", "Bassy", "Leveller", "Dirty" }, 0) });
+
+        return r;
+    }();
+
+    return registry;
+}
+
+inline const FxInfo* getFxInfo (int id)
+{
+    for (const auto& f : getFxRegistry())
+        if (f.id == id) return &f;
+    return nullptr;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Slot parameters.  The rack has kMaxRack slots and any effect can sit in any slot, so the host
+// sees generic parameters per slot: "S3_P1" .. "S3_P8" plus "S3_ON".  Every slot parameter is a
+// plain 0..1 value; these helpers convert to and from the real value of whichever effect is
+// currently in the slot (the effect's ParamSpec says how).
+inline juce::String slotParamId(int slot, int index) { return "S" + juce::String(slot + 1) + "_P" + juce::String(index + 1); }
+inline juce::String slotOnId(int slot)               { return "S" + juce::String(slot + 1) + "_ON"; }
+
+inline juce::NormalisableRange<float> makeRange(const ParamSpec& s)
+{
+    juce::NormalisableRange<float> r(s.minV, s.maxV, s.step);
+    if (s.kind == ParamKind::Knob && s.skewCentre > 0.0f)
+        r.setSkewForCentre(s.skewCentre);
+    return r;
+}
+
+inline float realFromNorm(const ParamSpec& s, float norm)
+{
+    norm = juce::jlimit(0.0f, 1.0f, norm);
+    switch (s.kind)
+    {
+        case ParamKind::Toggle: return norm >= 0.5f ? 1.0f : 0.0f;
+        case ParamKind::Choice: { const int n = juce::jmax(1, s.choices.size()); return (float) juce::jmin(n - 1, (int) (norm * (float) n)); }
+        default:                return makeRange(s).convertFrom0to1(norm);
+    }
+}
+
+inline float normFromReal(const ParamSpec& s, float real)
+{
+    switch (s.kind)
+    {
+        case ParamKind::Toggle: return real >= 0.5f ? 1.0f : 0.0f;
+        case ParamKind::Choice: { const int n = juce::jmax(1, s.choices.size()); return ((float) juce::jlimit(0, n - 1, (int) (real + 0.5f)) + 0.5f) / (float) n; }
+        default:                return makeRange(s).convertTo0to1(real);
+    }
+}
+
+inline float defaultNorm(const ParamSpec& s) { return normFromReal(s, s.defV); }
+
+inline int specIndex(const FxInfo& info, const juce::String& id)
+{
+    for (size_t i = 0; i < info.params.size(); ++i)
+        if (info.params[i].id == id) return (int) i;
+    return -1;
+}
+
+// ---- display helpers shared by the host-parameter text and the on-screen controls ----
+inline juce::String formatSpecValue(const ParamSpec& s, float real)
+{
+    switch (s.kind)
+    {
+        case ParamKind::Toggle: return real >= 0.5f ? "On" : "Off";
+        case ParamKind::Choice: return s.choices[juce::jlimit(0, juce::jmax(0, s.choices.size() - 1), (int) (real + 0.5f))];
+        default: break;
+    }
+    const float d = real * s.scale;
+    if (s.unit == "Hz" && std::abs(d) >= 1000.0f) return juce::String(d / 1000.0f, 2) + " kHz";
+    if (s.unit.isEmpty()) return juce::String(d, s.decimals);
+    if (s.unit == "%")    return juce::String(d, s.decimals) + "%";
+    return juce::String(d, s.decimals) + " " + s.unit;
+}
+
+inline float parseSpecValue(const ParamSpec& s, const juce::String& text)
+{
+    const juce::String t = text.trim();
+    float v = t.getFloatValue();
+    if (t.containsIgnoreCase("k")) v *= 1000.0f;
+    return juce::jlimit(s.minV, s.maxV, v / s.scale);
+}

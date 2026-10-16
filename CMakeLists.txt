@@ -31,11 +31,15 @@ juce_generate_juce_header(ModularFXSuite)
 target_sources(ModularFXSuite
     PRIVATE
         Source/CustomLookAndFeel.h
+        Source/FxRegistry.h
+        Source/ModuleCards.h
         Source/PluginProcessor.h
         Source/PluginProcessor.cpp
         Source/PluginEditor.h
         Source/PluginEditor.cpp
+        Source/Modules/FxBase.h
         Source/Modules/DSPModules.h
+        Source/Modules/NewEffects.h
 )
 
 target_compile_definitions(ModularFXSuite

@@ -122,3 +122,93 @@ public:
         g.strokePath(pointer, juce::PathStrokeType(2.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
 };
+
+// Generic knob used by the cards that are built from the FX registry.
+// Draws an accent-coloured value arc around a dark knob body.
+class AccentKnobLookAndFeel : public juce::LookAndFeel_V4
+{
+public:
+    AccentKnobLookAndFeel(juce::Colour accentColour, juce::Colour bodyColour)
+        : accent(accentColour), body(bodyColour)
+    {
+        setColour(juce::Slider::textBoxTextColourId, juce::Colours::white.withAlpha(0.85f));
+        setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+        setColour(juce::Slider::textBoxBackgroundColourId, juce::Colours::transparentBlack);
+        setColour(juce::Slider::textBoxHighlightColourId, accentColour.withAlpha(0.4f));
+
+        setColour(juce::ComboBox::backgroundColourId, bodyColour.darker(0.3f));
+        setColour(juce::ComboBox::textColourId, juce::Colours::white);
+        setColour(juce::ComboBox::outlineColourId, accentColour.withAlpha(0.5f));
+        setColour(juce::ComboBox::arrowColourId, accentColour);
+        setColour(juce::PopupMenu::backgroundColourId, juce::Colour(0xFF1E1E1E));
+        setColour(juce::PopupMenu::textColourId, juce::Colours::white);
+        setColour(juce::PopupMenu::highlightedBackgroundColourId, accentColour.withAlpha(0.6f));
+        setColour(juce::PopupMenu::highlightedTextColourId, juce::Colours::white);
+
+        setColour(juce::TextButton::buttonColourId, bodyColour.darker(0.3f));
+        setColour(juce::TextButton::buttonOnColourId, accentColour);
+        setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.8f));
+        setColour(juce::TextButton::textColourOnId, juce::Colours::black);
+
+        setColour(juce::ToggleButton::tickColourId, accentColour);
+        setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
+        setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+    }
+
+    juce::Font getLabelFont(juce::Label&) override { return juce::Font(juce::FontOptions(12.0f)); }
+
+    void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
+                          float sliderPosProportional, float rotaryStartAngle,
+                          float rotaryEndAngle, juce::Slider& slider) override
+    {
+        if (width <= 0 || height <= 0) return;
+
+        auto bounds = juce::Rectangle<float>(static_cast<float>(x), static_cast<float>(y),
+                                             static_cast<float>(width), static_cast<float>(height)).reduced(3.0f);
+        const float radius = juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.5f;
+        if (radius <= 6.0f) return;
+
+        const auto centre = bounds.getCentre();
+        const float alpha = slider.isEnabled() ? 1.0f : 0.35f;
+        const float pos = juce::jlimit(0.0f, 1.0f, sliderPosProportional);
+        const float angle = rotaryStartAngle + pos * (rotaryEndAngle - rotaryStartAngle);
+        const float arcR = radius - 2.0f;
+
+        juce::Path track;
+        track.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f, rotaryStartAngle, rotaryEndAngle, true);
+        g.setColour(juce::Colours::white.withAlpha(0.12f * alpha));
+        g.strokePath(track, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+        // fill from the left, or from the centre for bipolar controls
+        // (slot parameters are plain 0..1 values, so bipolar controls say where their zero sits with a property)
+        const auto zeroProp = slider.getProperties()["zeroNorm"];
+        const bool bipolar = ! zeroProp.isVoid();
+        const float zeroPos = bipolar ? static_cast<float>(slider.valueToProportionOfLength(static_cast<double>(zeroProp))) : 0.0f;
+        const float zeroAngle = rotaryStartAngle + zeroPos * (rotaryEndAngle - rotaryStartAngle);
+        const float from = juce::jmin(zeroAngle, angle), to = juce::jmax(zeroAngle, angle);
+        if (to - from > 0.01f)
+        {
+            juce::Path value;
+            value.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f, from, to, true);
+            g.setColour(accent.withAlpha(alpha));
+            g.strokePath(value, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+
+        const float bodyR = radius - 7.0f;
+        g.setColour(juce::Colours::black.withAlpha(0.25f * alpha));
+        g.fillEllipse(centre.x - bodyR, centre.y - bodyR + 2.0f, bodyR * 2.0f, bodyR * 2.0f);
+        g.setColour(body.withAlpha(alpha));
+        g.fillEllipse(centre.x - bodyR, centre.y - bodyR, bodyR * 2.0f, bodyR * 2.0f);
+        g.setColour(juce::Colours::white.withAlpha(0.15f * alpha));
+        g.drawEllipse(centre.x - bodyR, centre.y - bodyR, bodyR * 2.0f, bodyR * 2.0f, 1.0f);
+
+        juce::Path pointer;
+        pointer.startNewSubPath(centre.x + std::sin(angle) * bodyR * 0.35f, centre.y - std::cos(angle) * bodyR * 0.35f);
+        pointer.lineTo(centre.x + std::sin(angle) * bodyR * 0.9f, centre.y - std::cos(angle) * bodyR * 0.9f);
+        g.setColour(juce::Colours::white.withAlpha(alpha));
+        g.strokePath(pointer, juce::PathStrokeType(2.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+private:
+    juce::Colour accent, body;
+};
