@@ -1,20 +1,26 @@
 #include "PluginEditor.h"
 
-namespace { constexpr int kTopBar = 46; constexpr int kPad = 10; }
+namespace { constexpr int kTopBar = 46; constexpr int kPad = 10; constexpr int kLeftW = 200; constexpr int kRightW = 150; constexpr int kCentreW = 880; }
 
 ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProcessor& p)
-    : AudioProcessorEditor(&p), audioProcessor(p)
+    : AudioProcessorEditor(&p), audioProcessor(p), presetPanel(p), outputPanel(p)
 {
+    addAndMakeVisible(presetPanel);
+    addAndMakeVisible(outputPanel);
     viewport.setViewedComponent(&rack, false);
     viewport.setScrollBarsShown(false, true);
     viewport.setScrollBarThickness(10);
     addAndMakeVisible(viewport);
 
-    addButton.onClick = [this] { showAddMenu(); };
-    addAndMakeVisible(addButton);
+    rack.addChildComponent(addTile);
+    addTile.onClick = [this] { showAddMenu(); };
+
+    browser.onPick  = [this](int type) { addModule(type); };
+    browser.onClose = [this] { closeBrowser(); };
+    addChildComponent(browser);
 
     audioProcessor.rackChanged.addChangeListener(this);
-    setSize(920, kTopBar + kCardH + 2 * kPad + 12);
+    setSize(kLeftW + kCentreW + kRightW, kTopBar + kCardH + 2 * kPad + 12);
     layoutRack();
 }
 
@@ -26,7 +32,9 @@ ModularFXAudioProcessorEditor::~ModularFXAudioProcessorEditor()
 void ModularFXAudioProcessorEditor::paint(juce::Graphics& g)
 {
     if (getWidth() <= 0 || getHeight() <= 0) return;
-    g.fillAll(juce::Colour(0xFF1E1E1E));
+    g.fillAll(juce::Colour(0xFF0F1013));
+    g.setColour(juce::Colour(0xFF24262B));
+    g.drawHorizontalLine(kTopBar - 1, 0.0f, (float) getWidth());
     g.setColour(juce::Colours::white);
     g.setFont(juce::Font(juce::FontOptions(18.0f, juce::Font::bold)));
     g.drawText("Modular FX Suite", 16, 8, 220, 30, juce::Justification::centredLeft);
@@ -39,8 +47,10 @@ void ModularFXAudioProcessorEditor::paint(juce::Graphics& g)
 
 void ModularFXAudioProcessorEditor::resized()
 {
-    addButton.setBounds(getWidth() - 140, 10, 124, 26);
-    viewport.setBounds(0, kTopBar, getWidth(), getHeight() - kTopBar);
+    presetPanel.setBounds(0, kTopBar, kLeftW, getHeight() - kTopBar);
+    outputPanel.setBounds(getWidth() - kRightW, kTopBar, kRightW, getHeight() - kTopBar);
+    viewport.setBounds(kLeftW, kTopBar, getWidth() - kLeftW - kRightW, getHeight() - kTopBar);
+    browser.setBounds(getLocalBounds());
     layoutRack();
 }
 
@@ -79,26 +89,30 @@ void ModularFXAudioProcessorEditor::layoutRack()
         x += kCardW + kPad;
     }
 
+    const bool full = (int) entries.size() >= kMaxRack;
+    addTile.setVisible(! full);
+    if (! full)
+    {
+        addTile.setBounds(x, kPad, kCardW, kCardH);
+        x += kCardW + kPad;
+    }
+
     rack.setSize(juce::jmax(viewport.getMaximumVisibleWidth(), x), kCardH + 2 * kPad);
+    presetPanel.refresh();
     repaint();
 }
 
 void ModularFXAudioProcessorEditor::showAddMenu()
 {
-    juce::PopupMenu menu;
-    if ((int) audioProcessor.getRack().size() >= kMaxRack)
-    {
-        menu.addItem(9999, "Rack is full (" + juce::String(kMaxRack) + " effects max)", false, false);
-    }
-    else
-    {
-        for (const auto& info : getFxRegistry())
-            menu.addItem(info.id, info.name);        // any effect can be added as many times as you like
-    }
+    if ((int) audioProcessor.getRack().size() >= kMaxRack) return;
+    browser.setBounds(getLocalBounds());
+    browser.open();
+}
 
-    juce::Component::SafePointer<ModularFXAudioProcessorEditor> safe(this);
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&addButton),
-                       [safe](int result) { if (safe != nullptr && result > 0 && result < ID_NumModules) safe->addModule(result); });
+void ModularFXAudioProcessorEditor::closeBrowser()
+{
+    browser.setVisible(false);
+    repaint();
 }
 
 void ModularFXAudioProcessorEditor::addModule(int type)

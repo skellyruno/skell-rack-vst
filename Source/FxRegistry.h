@@ -28,6 +28,13 @@ enum ModuleID : int
     ID_Tremolo,
     ID_Distortion,
     ID_OneKnob,
+    ID_PitchShifter,
+    ID_MultiShifter,
+    ID_DualOctaver,
+    ID_GuitarAmp,
+    ID_GuitarCab,
+    ID_FeedbackKiller,
+    ID_DeEsser,
     ID_NumModules
 };
 
@@ -280,6 +287,71 @@ inline const std::vector<FxInfo>& getFxRegistry()
              0xFF2A2A2A, 0xFFFFFFFF, DisplayKind::None, false,
              { Pct ("ONE_AMT", "Amount", 0.5f),
                C ("ONE_MODE", "Style", StringArray { "Brighter", "Echo", "Punchy", "Room", "Toasty", "Bassy", "Leveller", "Dirty" }, 0) });
+
+
+        // ------------------------------------------------------------ pitch, amps, polish
+        add (ID_PitchShifter, "Pitch Shifter", "PS",
+             "Moves the pitch up or down by up to an octave. Semitones are whole steps on the keyboard, Fine tunes in cents.",
+             0xFF1C2230, 0xFF7DD3FC, DisplayKind::None, false,
+             { K ("PS_SEMI", "Semitones", -12.0f, 12.0f, 0.0f, "st", 0, 0.0f, 1.0f, 1.0f),
+               K ("PS_FINE", "Fine", -50.0f, 50.0f, 0.0f, "ct", 0),
+               Pct ("PS_MIX", "Mix", 1.0f) });
+
+        add (ID_MultiShifter, "Multi Shifter", "MS",
+             "Three pitch-shifted voices blended with the original, each with its own pitch and level. Spread pans the voices across the stereo field. Great for instant harmonies.",
+             0xFF211B36, 0xFFC4B5FD, DisplayKind::None, false,
+             { K ("MS_P1", "Pitch 1", -24.0f, 24.0f, 4.0f, "st", 0, 0.0f, 1.0f, 1.0f),
+               Pct ("MS_L1", "Level 1", 0.5f),
+               K ("MS_P2", "Pitch 2", -24.0f, 24.0f, 7.0f, "st", 0, 0.0f, 1.0f, 1.0f),
+               Pct ("MS_L2", "Level 2", 0.5f),
+               K ("MS_P3", "Pitch 3", -24.0f, 24.0f, -12.0f, "st", 0, 0.0f, 1.0f, 1.0f),
+               Pct ("MS_L3", "Level 3", 0.3f),
+               Pct ("MS_DRY", "Dry", 1.0f),
+               Pct ("MS_SPREAD", "Spread", 0.5f) });
+
+        add (ID_DualOctaver, "Dual Octaver", "OCT",
+             "Adds one octave above and one octave below the original. Tone darkens the shifted voices.",
+             0xFF1B2A2A, 0xFF5EEAD4, DisplayKind::None, false,
+             { Pct ("OCT_UP", "Octave Up", 0.5f),
+               Pct ("OCT_DOWN", "Octave Down", 0.5f),
+               Pct ("OCT_DRY", "Dry", 1.0f),
+               Pct ("OCT_TONE", "Tone", 0.7f) });
+
+        add (ID_GuitarAmp, "Guitar Amp", "AMP",
+             "A guitar amplifier with four basic characters, from sparkling Clean to tight, high-gain Metal. Follow it with a Guitar Cab for the full sound.",
+             0xFF221A14, 0xFFFB923C, DisplayKind::None, false,
+             { C ("AMP_TYPE", "Type", StringArray { "Clean", "Crunch", "Lead", "Metal" }, 1),
+               Pct ("AMP_GAIN", "Gain", 0.5f),
+               Pct ("AMP_BASS", "Bass", 0.5f),
+               Pct ("AMP_MID", "Mid", 0.5f),
+               Pct ("AMP_TREBLE", "Treble", 0.5f),
+               Pct ("AMP_PRES", "Presence", 0.5f),
+               K ("AMP_LEVEL", "Level", -24.0f, 6.0f, -6.0f, "dB", 1) });
+
+        add (ID_GuitarCab, "Guitar Cab", "CAB",
+             "Models the sound of popular speaker cabinets. Move the microphone from the centre of the speaker (bright) to the edge (dark), and add a touch of room.",
+             0xFF1E1A17, 0xFFD6A77A, DisplayKind::None, false,
+             { C ("CAB_TYPE", "Cabinet", StringArray { "1x12 Open", "2x12 Combo", "4x12 Closed", "1x10 Vintage" }, 2),
+               Pct ("CAB_MIC", "Mic Position", 0.5f),
+               K ("CAB_LOW", "Low Cut", 40.0f, 300.0f, 80.0f, "Hz", 0, 100.0f),
+               K ("CAB_HIGH", "High Cut", 2000.0f, 12000.0f, 7000.0f, "Hz", 0, 5000.0f),
+               Pct ("CAB_ROOM", "Room", 0.15f),
+               Pct ("CAB_MIX", "Mix", 1.0f),
+               K ("CAB_LEVEL", "Level", -12.0f, 12.0f, 0.0f, "dB", 1) });
+
+        add (ID_FeedbackKiller, "Feedback Killer", "FK",
+             "Listens for a loud, sustained whistle (feedback) and automatically places a narrow notch on it. Raise Sensitivity to catch quieter feedback sooner.",
+             0xFF1F2428, 0xFF93C5FD, DisplayKind::None, false,
+             { Pct ("FK_SENS", "Sensitivity", 0.5f),
+               K ("FK_DEPTH", "Depth", 6.0f, 36.0f, 24.0f, "dB", 0) });
+
+        add (ID_DeEsser, "DeEsser", "DS",
+             "Turns down harsh 's' and 'sh' sounds in a voice. Frequency picks where sibilance lives, Threshold sets how loud it must be, and Listen lets you hear only that band.",
+             0xFF2A2312, 0xFFFACC15, DisplayKind::GainReduction, false,
+             { K ("DS_FREQ", "Frequency", 3000.0f, 10000.0f, 6000.0f, "Hz", 0, 6000.0f),
+               K ("DS_THRESH", "Threshold", -50.0f, 0.0f, -30.0f, "dB", 1),
+               Pct ("DS_AMOUNT", "Amount", 0.6f),
+               T ("DS_LISTEN", "Listen", false) });
 
         return r;
     }();

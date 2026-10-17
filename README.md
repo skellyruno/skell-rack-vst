@@ -1,6 +1,6 @@
 # Modular FX Suite (VST3)
 
-A rack of 19 effects in one plugin, modelled on BandLab's effects. Add, remove and reorder
+A rack of 26 effects in one plugin, modelled on BandLab's effects. Add, remove and reorder
 effects from the **+ Add Effect** button and the **< >  X** buttons on each card. The rack
 scrolls sideways (mouse wheel works). Stack up to 10 effects (the same effect can be added as many times as you like) and drag a card by its header to change the signal order. Order and on/off state are saved with your project.
 
@@ -31,3 +31,15 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 Needs CMake 3.22+ and a C++17 compiler. The GitHub Actions workflow in `build.yml` builds the Windows VST3.
+
+## Adding effects
+
+Click the **Add Effect** tile at the end of the rack. The browser lists every effect by category (One Knobs, Polish, Amps & Cabs, Pitch Shift, Compressor, Limiter, Rhythmic, EQ, Delay, Reverb, Modulation, Distortion), scrolls, and has a search box. Click an effect to add it; the same effect can be added more than once. To list a new effect in the browser, add a line to `Source/FxCatalog.h`.
+
+## Side panels
+
+- **Presets (left):** pick with the arrows or by clicking the name. Eight built-in presets are included. **Save** stores the current rack (effects, order, settings) as your own preset in `Documents`-independent app data (`~/.../ModularFXSuite/Presets` as small XML files). The ⋮ menu clears the rack or deletes the selected user preset. The **fx** button bypasses every effect.
+- **Blend:** dry/wet for the whole rack (100% = fully effected).
+- **Volume, Pan, Reverb (right):** output fader, left/right balance, and a reverb send applied after the rack.
+
+These appear to the host as the automatable parameters Blend, Volume, Pan, Reverb and Bypass Effects.

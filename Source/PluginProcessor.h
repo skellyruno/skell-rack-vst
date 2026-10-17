@@ -6,10 +6,13 @@
 #include <vector>
 #include "FxRegistry.h"
 #include "Modules/FxBase.h"
+#include "Presets.h"
 
 // The rack is made of kMaxRack "slots".  Every slot can hold any effect (the same effect may sit in
 // several slots).  A slot owns 8 generic 0..1 host parameters plus an ON switch; the effect that
 // currently lives in the slot decides what those parameters mean.
+struct ReverbCoreHolder { fx::ReverbCore core; };
+
 class ModularFXAudioProcessor : public juce::AudioProcessor
 {
 public:
@@ -52,6 +55,15 @@ public:
 
     juce::AudioProcessorValueTreeState& getApvts() noexcept { return apvts; }
 
+    // ---- presets (message thread)
+    struct PresetInfo { juce::String name; bool factory = true; };
+    std::vector<PresetInfo> getPresetList() const;      // built-in presets first, then the user's saved ones
+    bool loadPreset (int index);
+    bool savePreset (const juce::String& name);         // saves the current rack; replaces a user preset of the same name
+    bool deletePreset (int index);                      // user presets only
+    void clearRack();
+    juce::String getPresetName() const;
+
     // Sent (asynchronously, on the message thread) when a saved project restores a different rack.
     juce::ChangeBroadcaster rackChanged;
 
@@ -79,6 +91,16 @@ private:
     std::array<int, kSlots> audioOrder {};
     int audioCount = 0;
     std::array<bool, kSlots> wasRunning {};
+
+    // master section (after the rack)
+    enum { kBlend, kVol, kPan, kRev, kByp, kNumMaster };
+    std::array<std::atomic<float>*, kNumMaster> masterRaw {};
+    juce::AudioBuffer<float> dryBuf;
+    ReverbCoreHolder reverbHolder;
+    fx::Smooth blendSm, volSm, panLSm, panRSm, revSm;
+    void processChunk (juce::AudioBuffer<float>& buf, const fx::Context& ctx);
+    bool applyPreset (const PresetDef& def);
+    PresetDef readPreset (int index, bool& ok) const;
 
     double currentSampleRate = 44100.0;
     int currentBlockSize = 512;

@@ -40,6 +40,9 @@ target_sources(ModularFXSuite
         Source/Modules/FxBase.h
         Source/Modules/DSPModules.h
         Source/Modules/NewEffects.h
+        Source/Modules/MoreEffects.h
+        Source/FxCatalog.h
+        Source/EffectBrowser.h
 )
 
 target_compile_definitions(ModularFXSuite
