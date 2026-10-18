@@ -1,6 +1,6 @@
 # Modular FX Suite (VST3)
 
-A rack of 26 effects in one plugin, modelled on BandLab's effects. Add, remove and reorder
+A rack of 39 effects in one plugin, modelled on BandLab's effects. Add, remove and reorder
 effects from the **+ Add Effect** button and the **< >  X** buttons on each card. The rack
 scrolls sideways (mouse wheel works). Stack up to 10 effects (the same effect can be added as many times as you like) and drag a card by its header to change the signal order. Order and on/off state are saved with your project.
 
@@ -34,7 +34,7 @@ Needs CMake 3.22+ and a C++17 compiler. The GitHub Actions workflow in `build.ym
 
 ## Adding effects
 
-Click the **Add Effect** tile at the end of the rack. The browser lists every effect by category (One Knobs, Polish, Amps & Cabs, Pitch Shift, Compressor, Limiter, Rhythmic, EQ, Delay, Reverb, Modulation, Distortion), scrolls, and has a search box. Click an effect to add it; the same effect can be added more than once. To list a new effect in the browser, add a line to `Source/FxCatalog.h`.
+Click the **Add Effect** tile at the end of the rack. The browser lists every effect by category (Recommended, One Knobs, Polish, Amps & Cabs, Pitch Shift, Compressor, Limiter, Rhythmic, EQ, Delay, Modulation, Distortion, Saturation, Reverb, Utility, Legacy), scrolls, and has a search box. Click an effect to add it; the same effect can be added more than once. To list a new effect in the browser, add a line to `Source/FxCatalog.h`.
 
 ## Side panels
 

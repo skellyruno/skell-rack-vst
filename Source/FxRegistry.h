@@ -35,6 +35,19 @@ enum ModuleID : int
     ID_GuitarCab,
     ID_FeedbackKiller,
     ID_DeEsser,
+    ID_Gain,
+    ID_Pumper,
+    ID_AutoPan,
+    ID_AutoFilter,
+    ID_AutoWah,
+    ID_Bitcrusher,
+    ID_Driver,
+    ID_Exciter,
+    ID_FetComp,
+    ID_OptoComp,
+    ID_DelayPlus,
+    ID_FilterEcho,
+    ID_LegacyDelay,
     ID_NumModules
 };
 
@@ -352,6 +365,124 @@ inline const std::vector<FxInfo>& getFxRegistry()
                K ("DS_THRESH", "Threshold", -50.0f, 0.0f, -30.0f, "dB", 1),
                Pct ("DS_AMOUNT", "Amount", 0.6f),
                T ("DS_LISTEN", "Listen", false) });
+
+
+        // ------------------------------------------------------------ utility, dynamics, modulation, delay, saturation
+        add (ID_Gain, "Gain", "GN",
+             "Turns the level up or down. Invert Phase flips the polarity and Mono sums left and right together.",
+             0xFF1C1F26, 0xFF9CA3AF, DisplayKind::None, false,
+             { K ("GAIN_DB", "Gain", -24.0f, 24.0f, 0.0f, "dB", 1),
+               T ("GAIN_INV", "Invert Phase", false),
+               T ("GAIN_MONO", "Mono", false) });
+
+        add (ID_Pumper, "Pumper", "PMP",
+             "Simulated side-chain compression: the volume ducks on every beat and swells back, the classic pumping dance sound. Locked to the project tempo.",
+             0xFF1F1B2E, 0xFF818CF8, DisplayKind::None, false,
+             { C ("PMP_RATE", "Rate", StringArray { "1/2", "1/4", "1/8", "1/16" }, 1),
+               Pct ("PMP_DEPTH", "Depth", 0.8f),
+               Pct ("PMP_RELEASE", "Release", 0.6f),
+               Pct ("PMP_CURVE", "Curve", 0.5f) });
+
+        add (ID_AutoPan, "Auto Pan", "APN",
+             "Moves the sound between the left and right speakers. Sync locks the movement to the tempo (stereo only).",
+             0xFF132A2A, 0xFF22D3EE, DisplayKind::None, false,
+             { dep (K ("APN_RATE", "Rate", 0.1f, 10.0f, 1.0f, "Hz", 2, 1.0f), "APN_SYNC", false),
+               dep (C ("APN_DIV", "Note", StringArray { "1 bar", "1/2", "1/4", "1/8", "1/16" }, 2), "APN_SYNC", true),
+               Pct ("APN_DEPTH", "Depth", 0.8f),
+               C ("APN_SHAPE", "Shape", StringArray { "Sine", "Triangle", "Square" }, 0),
+               T ("APN_SYNC", "Sync", false) });
+
+        add (ID_AutoFilter, "Auto Filter", "AF",
+             "A filter that sweeps up and down by itself. Pick low-pass, band-pass or high-pass, then set how fast and how far it moves.",
+             0xFF1A2433, 0xFF60A5FA, DisplayKind::None, false,
+             { C ("AF_TYPE", "Type", StringArray { "Low-pass", "Band-pass", "High-pass" }, 0),
+               K ("AF_CUTOFF", "Cutoff", 80.0f, 12000.0f, 1200.0f, "Hz", 0, 1000.0f),
+               K ("AF_RES", "Resonance", 0.5f, 12.0f, 2.0f, "", 1, 2.0f),
+               K ("AF_RATE", "Rate", 0.05f, 10.0f, 0.8f, "Hz", 2, 1.0f),
+               Pct ("AF_DEPTH", "Depth", 0.6f),
+               C ("AF_SHAPE", "Shape", StringArray { "Sine", "Triangle", "Ramp" }, 0),
+               Pct ("AF_MIX", "Mix", 1.0f) });
+
+        add (ID_AutoWah, "Auto Wah", "AW",
+             "A wah pedal that you play with your picking: the louder you play, the further the filter opens (or closes, in Down mode).",
+             0xFF2A1F12, 0xFFFBBF24, DisplayKind::None, false,
+             { C ("AW_MODE", "Direction", StringArray { "Up", "Down" }, 0),
+               Pct ("AW_SENS", "Sensitivity", 0.6f),
+               K ("AW_FREQ", "Frequency", 200.0f, 2000.0f, 500.0f, "Hz", 0, 600.0f),
+               K ("AW_RES", "Resonance", 1.0f, 12.0f, 4.0f, "", 1, 4.0f),
+               K ("AW_DECAY", "Decay", 20.0f, 500.0f, 120.0f, "ms", 0, 120.0f),
+               Pct ("AW_MIX", "Mix", 1.0f) });
+
+        add (ID_Bitcrusher, "Bitcrusher", "BCR",
+             "Downsamples the sound and cuts its bit depth for digital, crunchy lo-fi tones.",
+             0xFF241A33, 0xFFC026D3, DisplayKind::None, false,
+             { K ("BCR_BITS", "Bit Depth", 1.0f, 16.0f, 8.0f, "bit", 0, 0.0f, 1.0f, 1.0f),
+               K ("BCR_DOWN", "Downsample", 1.0f, 64.0f, 4.0f, "x", 0, 8.0f, 1.0f, 1.0f),
+               Pct ("BCR_MIX", "Mix", 1.0f) });
+
+        add (ID_Driver, "Driver", "DRV",
+             "Warms up a clean signal and adds gritty harmonics. Turn Drive up for more edge, Tone to brighten or soften it.",
+             0xFF2B1612, 0xFFF87171, DisplayKind::None, false,
+             { Pct ("DRV_DRIVE", "Drive", 0.4f),
+               Pct ("DRV_TONE", "Tone", 0.5f),
+               K ("DRV_LEVEL", "Level", -24.0f, 6.0f, -6.0f, "dB", 1),
+               Pct ("DRV_MIX", "Mix", 1.0f) });
+
+        add (ID_Exciter, "Exciter", "EXC",
+             "Adds sparkle by generating fresh high harmonics above the Frequency. Great for dull vocals and mixes.",
+             0xFF2A1E2F, 0xFFF0ABFC, DisplayKind::None, false,
+             { K ("EXC_FREQ", "Frequency", 1500.0f, 10000.0f, 4000.0f, "Hz", 0, 4000.0f),
+               Pct ("EXC_AMT", "Amount", 0.5f),
+               Pct ("EXC_MIX", "Mix", 1.0f) });
+
+        add (ID_FetComp, "FET Compressor", "FET",
+             "A fast, punchy compressor in the style of the classic FET limiting amplifier. Input drives the signal into the compressor, Output sets the final level.",
+             0xFF1E2024, 0xFFFB7185, DisplayKind::GainReduction, false,
+             { K ("FET_INPUT", "Input", 0.0f, 40.0f, 14.0f, "dB", 1),
+               K ("FET_OUTPUT", "Output", -24.0f, 12.0f, -6.0f, "dB", 1),
+               K ("FET_ATTACK", "Attack", 0.02f, 0.8f, 0.2f, "ms", 2, 0.2f),
+               K ("FET_RELEASE", "Release", 50.0f, 1100.0f, 300.0f, "ms", 0, 300.0f),
+               C ("FET_RATIO", "Ratio", StringArray { "4:1", "8:1", "12:1", "20:1", "All" }, 0),
+               Pct ("FET_MIX", "Mix", 1.0f) });
+
+        add (ID_OptoComp, "Opto Compressor", "OPT",
+             "Smooth, musical compression in the style of a classic optical compressor. Peak Reduction sets how much it squeezes, Gain brings the level back up.",
+             0xFF26221B, 0xFFE5C07B, DisplayKind::GainReduction, false,
+             { Pct ("OPT_PEAK", "Peak Reduction", 0.5f),
+               K ("OPT_GAIN", "Gain", 0.0f, 30.0f, 6.0f, "dB", 1),
+               C ("OPT_MODE", "Mode", StringArray { "Compress", "Limit" }, 0),
+               Pct ("OPT_MIX", "Mix", 1.0f) });
+
+        add (ID_DelayPlus, "Delay +", "DDP",
+             "Rhythmic multi-tap delay. Each pattern drops four echoes on the beat grid, spread across the stereo field.",
+             0xFF132B2E, 0xFF2DD4BF, DisplayKind::None, false,
+             { C ("DDP_PATTERN", "Pattern", StringArray { "Straight", "Dotted", "Triplet", "Syncopated", "Cascade" }, 3),
+               C ("DDP_BASE", "Note", StringArray { "1/4", "1/8", "1/16" }, 1),
+               Pct ("DDP_FB", "Feedback", 0.4f),
+               Pct ("DDP_TONE", "Tone", 0.6f),
+               Pct ("DDP_SPREAD", "Spread", 0.7f),
+               Pct ("DDP_MIX", "Mix", 0.35f) });
+
+        add (ID_FilterEcho, "Filter Echo +", "FEC",
+             "A tempo-synced echo where every repeat passes through a filter, so the echoes get darker, thinner or more resonant as they fade.",
+             0xFF2B1535, 0xFFD946EF, DisplayKind::None, false,
+             { C ("FEC_DIV", "Note", StringArray { "1/4", "1/8", "1/8 dotted", "1/16", "1/2", "1/8 triplet" }, 1),
+               Pct ("FEC_FB", "Feedback", 0.5f),
+               K ("FEC_FREQ", "Filter", 150.0f, 12000.0f, 2000.0f, "Hz", 0, 1500.0f),
+               K ("FEC_RES", "Resonance", 0.5f, 8.0f, 1.5f, "", 1, 1.5f),
+               C ("FEC_TYPE", "Type", StringArray { "Low-pass", "Band-pass", "High-pass" }, 0),
+               Pct ("FEC_MOD", "Modulation", 0.2f),
+               Pct ("FEC_MIX", "Mix", 0.35f) });
+
+        add (ID_LegacyDelay, "D-Delay", "DDL",
+             "A classic delay with separate left and right times and cross-feedback for ping-pong style movement.",
+             0xFF2A2415, 0xFFFDE047, DisplayKind::None, false,
+             { K ("DDL_TL", "Left Time", 1.0f, 2000.0f, 300.0f, "ms", 0, 300.0f),
+               K ("DDL_TR", "Right Time", 1.0f, 2000.0f, 450.0f, "ms", 0, 300.0f),
+               Pct ("DDL_FB", "Feedback", 0.4f),
+               Pct ("DDL_CROSS", "Cross", 0.3f),
+               Pct ("DDL_TONE", "Tone", 0.6f),
+               Pct ("DDL_MIX", "Mix", 0.3f) });
 
         return r;
     }();

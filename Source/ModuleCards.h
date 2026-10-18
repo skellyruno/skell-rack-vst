@@ -4,6 +4,7 @@
 #include <vector>
 #include "PluginProcessor.h"
 #include "CustomLookAndFeel.h"
+#include "FxCatalog.h"
 #include "Modules/NewEffects.h"     // VisualEq::makeCoeffs, so the EQ curve matches the audio exactly
 
 constexpr int kCardW = 280;
@@ -211,7 +212,13 @@ protected:
         if (getWidth() <= 0 || getHeight() <= 0 || info == nullptr) return;
         g.setColour(textColour);
         g.setFont(juce::Font(juce::FontOptions(14.0f, juce::Font::bold)));
-        g.drawText(info->name, 80, 6, getWidth() - 80 - 84, 24, juce::Justification::centredLeft);
+        juce::String title = info->name;
+        if (moduleId == ID_OneKnob)                                   // the One Knobs card is named after its style
+        {
+            const auto& style = oneKnobStyleName((int) realParam("ONE_MODE"));
+            if (style.isNotEmpty()) title = style;
+        }
+        g.drawText(title, 80, 6, getWidth() - 80 - 84, 24, juce::Justification::centredLeft);
 
         g.setColour(textColour.withAlpha(0.3f));
         const int w = getWidth(), h = getHeight();

@@ -15,15 +15,24 @@ namespace fxbrowser
     const juce::Colour kGrey   { 0xFF8B93A1 };
 
     // Little mock-up of the effect's card, drawn from its parameter list.
-    inline void drawThumb (juce::Graphics& g, const FxInfo& info, juce::Rectangle<float> r)
+    inline void drawThumb (juce::Graphics& g, const FxInfo& info, juce::Rectangle<float> r, juce::uint32 tint = 0)
     {
         if (info.id == ID_OneKnob)
         {
-            g.setColour (juce::Colour (0xFFFFB703));
+            g.setColour (juce::Colour (tint != 0 ? tint : 0xFFFFB703));
             g.fillRoundedRectangle (r, 9.0f);
             g.setColour (juce::Colours::black.withAlpha(0.85f));
             g.fillRoundedRectangle (r.withSizeKeepingCentre (r.getWidth() * 0.34f, 4.0f).withY (r.getY() + 8.0f), 2.0f);
             const auto k = r.withSizeKeepingCentre (r.getWidth() * 0.5f, r.getWidth() * 0.5f).translated (0.0f, 4.0f);
+            g.setColour (juce::Colours::black.withAlpha (0.35f));
+            for (int i = 0; i < 18; ++i)                                    // ring of tick marks around the knob
+            {
+                const float a = juce::MathConstants<float>::pi * (0.8f + 1.4f * (float) i / 17.0f);
+                const auto c = k.getCentre();
+                g.drawLine (c.x + std::cos (a) * k.getWidth() * 0.58f, c.y + std::sin (a) * k.getWidth() * 0.58f,
+                            c.x + std::cos (a) * k.getWidth() * 0.68f, c.y + std::sin (a) * k.getWidth() * 0.68f, 1.2f);
+            }
+            g.setColour (juce::Colours::black.withAlpha (0.85f));
             g.fillEllipse (k);
             g.setColour (juce::Colours::white);
             g.drawLine (k.getCentreX(), k.getCentreY(), k.getRight() - 6.0f, k.getCentreY() - 7.0f, 2.0f);
@@ -93,7 +102,7 @@ namespace fxbrowser
 class EffectBrowser : public juce::Component, private juce::TextEditor::Listener
 {
 public:
-    std::function<void (int)> onPick;
+    std::function<void (const FxCatalogEntry&)> onPick;
     std::function<void()> onClose;
 
     EffectBrowser()
@@ -245,10 +254,10 @@ private:
     // ------------------------------------------------ right: effects
     struct Row : juce::Component
     {
-        int id = 0;
+        FxCatalogEntry entry;
         const FxInfo* info = nullptr;
-        juce::String tagline;
-        std::function<void (int)> onClick;
+        juce::String displayName;
+        std::function<void (const FxCatalogEntry&)> onClick;
         bool hover = false;
 
         void paint (juce::Graphics& g) override
@@ -256,14 +265,14 @@ private:
             auto r = getLocalBounds().toFloat().reduced (4.0f, 2.0f);
             if (hover) { g.setColour (fxbrowser::kHover); g.fillRoundedRectangle (r, 10.0f); }
             if (info == nullptr) return;
-            fxbrowser::drawThumb (g, *info, juce::Rectangle<float> (r.getX() + 8.0f, r.getCentreY() - (float) kThumb * 0.5f, (float) kThumb, (float) kThumb));
+            fxbrowser::drawThumb (g, *info, juce::Rectangle<float> (r.getX() + 8.0f, r.getCentreY() - (float) kThumb * 0.5f, (float) kThumb, (float) kThumb), entry.tint);
             const float tx = r.getX() + 8.0f + (float) kThumb + 16.0f;
             g.setColour (juce::Colours::white);
             g.setFont (juce::Font (juce::FontOptions (17.0f, juce::Font::bold)));
-            g.drawText (info->name, juce::Rectangle<float> (tx, r.getY() + 14.0f, r.getRight() - tx - 40.0f, 24.0f), juce::Justification::centredLeft);
+            g.drawText (displayName, juce::Rectangle<float> (tx, r.getY() + 14.0f, r.getRight() - tx - 40.0f, 24.0f), juce::Justification::centredLeft);
             g.setColour (fxbrowser::kGrey);
             g.setFont (juce::Font (juce::FontOptions (14.0f)));
-            g.drawFittedText (tagline, juce::Rectangle<float> (tx, r.getY() + 40.0f, r.getRight() - tx - 40.0f, 40.0f).toNearestInt(), juce::Justification::topLeft, 2);
+            g.drawFittedText (entry.tagline, juce::Rectangle<float> (tx, r.getY() + 40.0f, r.getRight() - tx - 40.0f, 40.0f).toNearestInt(), juce::Justification::topLeft, 2);
             if (hover)
             {
                 g.setColour (juce::Colours::white.withAlpha (0.8f));
@@ -274,7 +283,7 @@ private:
         }
         void mouseEnter (const juce::MouseEvent&) override { hover = true;  repaint(); }
         void mouseExit  (const juce::MouseEvent&) override { hover = false; repaint(); }
-        void mouseUp (const juce::MouseEvent& e) override { if (getLocalBounds().contains (e.getPosition()) && onClick) onClick (id); }
+        void mouseUp (const juce::MouseEvent& e) override { if (getLocalBounds().contains (e.getPosition()) && onClick) onClick (entry); }
     };
 
     struct Section { juce::String title, blurb; int y = 0; int category = -1; };
@@ -309,13 +318,13 @@ private:
     void textEditorEscapeKeyPressed (juce::TextEditor&) override { close(); }
     void textEditorReturnKeyPressed (juce::TextEditor&) override
     {
-        if (! list.rows.empty() && onPick) { const int id = list.rows.front()->id; setVisible (false); onPick (id); if (onClose) onClose(); }
+        if (! list.rows.empty() && onPick) { const auto e = list.rows.front()->entry; setVisible (false); onPick (e); if (onClose) onClose(); }
     }
 
-    void pick (int id)
+    void pick (const FxCatalogEntry& entry)
     {
         setVisible (false);
-        if (onPick) onPick (id);
+        if (onPick) onPick (entry);
         if (onClose) onClose();
     }
 
@@ -359,8 +368,8 @@ private:
         auto addRow = [&] (const FxCatalogEntry& e)
         {
             auto row = std::make_unique<Row>();
-            row->id = e.id;  row->info = getFxInfo (e.id);  row->tagline = e.tagline;
-            row->onClick = [this] (int id) { pick (id); };
+            row->entry = e;  row->info = getFxInfo (e.id);  row->displayName = catalogDisplayName (e);
+            row->onClick = [this] (const FxCatalogEntry& en) { pick (en); };
             row->setBounds (0, y, 10, kRowH);
             list.addAndMakeVisible (*row);
             list.rows.push_back (std::move (row));
@@ -385,23 +394,20 @@ private:
         }
         else
         {
-            int count = 0;
+            std::vector<const FxCatalogEntry*> hits;
             for (const auto& e : getFxCatalog())
             {
-                const auto* info = getFxInfo (e.id);
-                if (info == nullptr) continue;
-                if (info->name.containsIgnoreCase (q) || e.tagline.containsIgnoreCase (q) || e.category.containsIgnoreCase (q))
-                    ++count;
+                if (getFxInfo (e.id) == nullptr) continue;
+                const auto name = catalogDisplayName (e);
+                if (! (name.containsIgnoreCase (q) || e.tagline.containsIgnoreCase (q) || e.category.containsIgnoreCase (q))) continue;
+                bool dup = false;
+                for (const auto* h : hits) dup = dup || (h->id == e.id && h->name == e.name);      // listed in several categories: show once
+                if (! dup) hits.push_back (&e);
             }
-            list.sections.push_back ({ count > 0 ? "Results" : "No effects found", count > 0 ? "Effects matching \"" + q + "\"." : "Try a different word, like reverb, delay or pitch.", 0, -1 });
+            list.sections.push_back ({ ! hits.empty() ? "Results" : "No effects found",
+                                       ! hits.empty() ? "Effects matching \"" + q + "\"." : "Try a different word, like reverb, delay or pitch.", 0, -1 });
             y = kSectionH;
-            for (const auto& e : getFxCatalog())
-            {
-                const auto* info = getFxInfo (e.id);
-                if (info == nullptr) continue;
-                if (info->name.containsIgnoreCase (q) || e.tagline.containsIgnoreCase (q) || e.category.containsIgnoreCase (q))
-                    addRow (e);
-            }
+            for (const auto* h : hits) addRow (*h);
         }
         list.setSize (juce::jmax (10, listViewport.getMaximumVisibleWidth()), y + 8);
         layoutRows();

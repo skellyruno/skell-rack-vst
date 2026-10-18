@@ -67,7 +67,7 @@ private:
     void layoutRack();
     void showAddMenu();
     void closeBrowser();
-    void addModule(int type);
+    void addModule(const FxCatalogEntry& entry);
     void moveModule(int slot, int direction);
     void removeModule(int slot);
     void dragBegin(int slot);

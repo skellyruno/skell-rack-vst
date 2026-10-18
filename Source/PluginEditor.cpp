@@ -15,7 +15,7 @@ ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProce
     rack.addChildComponent(addTile);
     addTile.onClick = [this] { showAddMenu(); };
 
-    browser.onPick  = [this](int type) { addModule(type); };
+    browser.onPick  = [this](const FxCatalogEntry& entry) { addModule(entry); };
     browser.onClose = [this] { closeBrowser(); };
     addChildComponent(browser);
 
@@ -115,9 +115,11 @@ void ModularFXAudioProcessorEditor::closeBrowser()
     repaint();
 }
 
-void ModularFXAudioProcessorEditor::addModule(int type)
+void ModularFXAudioProcessorEditor::addModule(const FxCatalogEntry& entry)
 {
-    if (audioProcessor.addEffect(type) < 0) return;
+    const int slot = audioProcessor.addEffect(entry.id);
+    if (slot < 0) return;
+    for (const auto& v : entry.initial) audioProcessor.setSlotParam(slot, v.first, v.second);
     layoutRack();
     viewport.setViewPosition(juce::jmax(0, rack.getWidth() - viewport.getMaximumVisibleWidth()), 0);   // reveal the new card
 }

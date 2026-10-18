@@ -46,6 +46,7 @@ public:
     // ---- rack editing (message thread) ----
     int  addEffect (int type);                          // returns the slot used, or -1 when the rack is full
     void removeEffect (int slot);
+    void setSlotParam (int slot, const juce::String& specId, float realValue);   // set one control of a slot by its registry name
     void setRackOrder (const std::vector<int>& slotsInOrder);
     std::vector<RackEntry> getRack() const;             // in signal order
     int  getSlotType (int slot) const noexcept;         // 0 = empty

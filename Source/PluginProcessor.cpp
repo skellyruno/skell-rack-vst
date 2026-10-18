@@ -3,6 +3,7 @@
 #include "Modules/DSPModules.h"
 #include "Modules/NewEffects.h"
 #include "Modules/MoreEffects.h"
+#include "Modules/ExtraEffects.h"
 
 namespace
 {
@@ -40,6 +41,19 @@ namespace
             case ID_GuitarCab:     return std::make_unique<fx::GuitarCabFx> (s);
             case ID_FeedbackKiller:return std::make_unique<fx::FeedbackKillerFx> (s);
             case ID_DeEsser:       return std::make_unique<fx::DeEsserFx> (s);
+            case ID_Gain: return std::make_unique<fx::GainFx> (s);
+            case ID_Pumper: return std::make_unique<fx::PumperFx> (s);
+            case ID_AutoPan: return std::make_unique<fx::AutoPanFx> (s);
+            case ID_AutoFilter: return std::make_unique<fx::AutoFilterFx> (s);
+            case ID_AutoWah: return std::make_unique<fx::AutoWahFx> (s);
+            case ID_Bitcrusher: return std::make_unique<fx::BitcrusherFx> (s);
+            case ID_Driver: return std::make_unique<fx::DriverFx> (s);
+            case ID_Exciter: return std::make_unique<fx::ExciterFx> (s);
+            case ID_FetComp: return std::make_unique<fx::FetCompFx> (s);
+            case ID_OptoComp: return std::make_unique<fx::OptoCompFx> (s);
+            case ID_DelayPlus: return std::make_unique<fx::DelayPlusFx> (s);
+            case ID_FilterEcho: return std::make_unique<fx::FilterEchoFx> (s);
+            case ID_LegacyDelay: return std::make_unique<fx::LegacyDelayFx> (s);
             default:            return nullptr;
         }
     }
@@ -266,6 +280,16 @@ void ModularFXAudioProcessor::removeEffect (int slot)
     std::vector<RackEntry> r = getRack();
     r.erase (std::remove_if (r.begin(), r.end(), [slot] (const RackEntry& e) { return e.slot == slot; }), r.end());
     commitRack (r, false);
+}
+
+void ModularFXAudioProcessor::setSlotParam (int slot, const juce::String& specId, float realValue)
+{
+    const FxInfo* info = getFxInfo (getSlotType (slot));
+    if (info == nullptr) return;
+    const int idx = specIndex (*info, specId);
+    if (idx < 0) return;
+    if (auto* p = apvts.getParameter (slotParamId (slot, idx)))
+        p->setValueNotifyingHost (normFromReal (info->params[(size_t) idx], realValue));
 }
 
 void ModularFXAudioProcessor::setRackOrder (const std::vector<int>& slots)
