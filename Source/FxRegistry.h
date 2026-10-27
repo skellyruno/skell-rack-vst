@@ -48,6 +48,14 @@ enum ModuleID : int
     ID_DelayPlus,
     ID_FilterEcho,
     ID_LegacyDelay,
+    ID_FbkComp,
+    ID_SpringReverb,
+    ID_MultiFilter,
+    ID_EzEq,
+    ID_GraphicEq,
+    ID_VintageLimiter,
+    ID_Eq3M,
+    ID_GtrSqueeze,
     ID_NumModules
 };
 
@@ -149,8 +157,8 @@ inline const std::vector<FxInfo>& getFxRegistry()
         add (ID_NoiseGate, "Noise Gate", "GATE",
              "Silences the signal when it drops below the threshold. Drag the Threshold pill up and down. Attack and release shape how fast the gate opens and closes.",
              0xFF0F0F0F, 0xFFFFB703, DisplayKind::None, true,
-             { K ("GATE_THRESH", "Threshold", -60.0f, 0.0f, -30.0f, "dB", 1),
-               K ("GATE_ATTACK", "Attack", 1.0f, 100.0f, 37.0f, "ms", 0),
+             { K ("GATE_THRESH", "Threshold", -60.0f, 0.0f, -48.0f, "dB", 1),
+               K ("GATE_ATTACK", "Attack", 1.0f, 100.0f, 5.0f, "ms", 0),
                K ("GATE_RELEASE", "Release", 10.0f, 1000.0f, 200.0f, "ms", 0, 150.0f) });
 
         add (ID_Chorus, "Chorus Ensemble", "CHO",
@@ -175,15 +183,14 @@ inline const std::vector<FxInfo>& getFxRegistry()
                K ("EQ_HF", "High Freq", 2000.0f, 16000.0f, 8000.0f, "Hz", 0, 5600.0f),
                K ("EQ_HG", "High Gain", -15.0f, 15.0f, 0.0f, "dB", 1) });
 
-        add (ID_Compressor, "Compressor", "COMP",
-             "Turns down loud parts so the level evens out. The bar shows how much gain is being removed. Use Makeup to bring the level back up, and Mix for parallel compression.",
-             0xFF1B1B22, 0xFFFF6B6B, DisplayKind::GainReduction, false,
-             { K ("COMP_THRESH", "Threshold", -60.0f, 0.0f, -18.0f, "dB", 1),
-               K ("COMP_RATIO", "Ratio", 1.0f, 20.0f, 4.0f, ": 1", 1, 4.0f),
-               K ("COMP_ATTACK", "Attack", 0.1f, 100.0f, 10.0f, "ms", 1, 10.0f),
+        add (ID_Compressor, "DIGI Comp", "COMP",
+             "Turns down loud parts so the level evens out. Threshold sets where it starts, Ratio how hard it squeezes, and Knee how gently it eases in. Make-up gain is added automatically.",
+             0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
+             { K ("COMP_ATTACK", "Attack", 0.1f, 100.0f, 10.0f, "ms", 1, 10.0f),
                K ("COMP_RELEASE", "Release", 10.0f, 1000.0f, 120.0f, "ms", 0, 150.0f),
-               K ("COMP_MAKEUP", "Makeup", 0.0f, 24.0f, 0.0f, "dB", 1),
-               Pct ("COMP_MIX", "Mix", 1.0f) });
+               K ("COMP_THRESH", "Threshold", -60.0f, 0.0f, -18.0f, "dB", 1),
+               K ("COMP_RATIO", "Ratio", 1.0f, 20.0f, 4.0f, ": 1", 1, 4.0f),
+               K ("COMP_KNEE", "Knee", 0.0f, 24.0f, 6.0f, "dB", 1) });
 
         add (ID_MultiBand, "Multi-Band Comp", "MB",
              "Splits the sound into low, mid and high bands and compresses each on its own, so you can tighten the lows without squashing the highs.",
@@ -304,23 +311,23 @@ inline const std::vector<FxInfo>& getFxRegistry()
 
         // ------------------------------------------------------------ pitch, amps, polish
         add (ID_PitchShifter, "Pitch Shifter", "PS",
-             "Moves the pitch up or down by up to an octave. Semitones are whole steps on the keyboard, Fine tunes in cents.",
-             0xFF1C2230, 0xFF7DD3FC, DisplayKind::None, false,
-             { K ("PS_SEMI", "Semitones", -12.0f, 12.0f, 0.0f, "st", 0, 0.0f, 1.0f, 1.0f),
-               K ("PS_FINE", "Fine", -50.0f, 50.0f, 0.0f, "ct", 0),
+             "Moves the pitch up or down by up to an octave. Input Type tunes the shifter for voices, instruments or drums.",
+             0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
+             { C ("PS_TYPE", "Input Type", StringArray { "Vocal", "Instrument", "Drums" }, 0),
+               K ("PS_SHIFT", "Shift", -12.0f, 12.0f, 0.0f, "st", 2),
                Pct ("PS_MIX", "Mix", 1.0f) });
 
         add (ID_MultiShifter, "Multi Shifter", "MS",
-             "Three pitch-shifted voices blended with the original, each with its own pitch and level. Spread pans the voices across the stereo field. Great for instant harmonies.",
-             0xFF211B36, 0xFFC4B5FD, DisplayKind::None, false,
-             { K ("MS_P1", "Pitch 1", -24.0f, 24.0f, 4.0f, "st", 0, 0.0f, 1.0f, 1.0f),
-               Pct ("MS_L1", "Level 1", 0.5f),
-               K ("MS_P2", "Pitch 2", -24.0f, 24.0f, 7.0f, "st", 0, 0.0f, 1.0f, 1.0f),
-               Pct ("MS_L2", "Level 2", 0.5f),
-               K ("MS_P3", "Pitch 3", -24.0f, 24.0f, -12.0f, "st", 0, 0.0f, 1.0f, 1.0f),
-               Pct ("MS_L3", "Level 3", 0.3f),
-               Pct ("MS_DRY", "Dry", 1.0f),
-               Pct ("MS_SPREAD", "Spread", 0.5f) });
+             "Stacks pitch-shifted copies of the sound, up and down by an octave, a fifth and a fourth, each with its own level. Great for instant harmonies.",
+             0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
+             { C ("MS_TYPE", "Input Type", StringArray { "Vocal", "Instrument", "Drums" }, 0),
+               Pct ("MS_OCTUP", "Octave Up", 0.0f),
+               Pct ("MS_FIFTHUP", "Fifth Up", 0.0f),
+               Pct ("MS_FOURTHUP", "Fourth Up", 0.0f),
+               Pct ("MS_OCTDN", "Octave Down", 0.0f),
+               Pct ("MS_FIFTHDN", "Fifth Down", 0.0f),
+               Pct ("MS_FOURTHDN", "Fourth Down", 0.0f),
+               Pct ("MS_DRY", "Dry", 1.0f) });
 
         add (ID_DualOctaver, "Dual Octaver", "OCT",
              "Adds one octave above and one octave below the original. Tone darkens the shifted voices.",
@@ -353,18 +360,15 @@ inline const std::vector<FxInfo>& getFxRegistry()
                K ("CAB_LEVEL", "Level", -12.0f, 12.0f, 0.0f, "dB", 1) });
 
         add (ID_FeedbackKiller, "Feedback Killer", "FK",
-             "Listens for a loud, sustained whistle (feedback) and automatically places a narrow notch on it. Raise Sensitivity to catch quieter feedback sooner.",
-             0xFF1F2428, 0xFF93C5FD, DisplayKind::None, false,
-             { Pct ("FK_SENS", "Sensitivity", 0.5f),
-               K ("FK_DEPTH", "Depth", 6.0f, 36.0f, 24.0f, "dB", 0) });
+             "Listens for a loud, sustained whistle (feedback) and automatically places a narrow notch on it. Raise Amount to catch quieter feedback sooner and cut it harder.",
+             0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
+             { Pct ("FK_AMOUNT", "Amount", 0.5f) });
 
         add (ID_DeEsser, "DeEsser", "DS",
-             "Turns down harsh 's' and 'sh' sounds in a voice. Frequency picks where sibilance lives, Threshold sets how loud it must be, and Listen lets you hear only that band.",
-             0xFF2A2312, 0xFFFACC15, DisplayKind::GainReduction, false,
-             { K ("DS_FREQ", "Frequency", 3000.0f, 10000.0f, 6000.0f, "Hz", 0, 6000.0f),
-               K ("DS_THRESH", "Threshold", -50.0f, 0.0f, -30.0f, "dB", 1),
-               Pct ("DS_AMOUNT", "Amount", 0.6f),
-               T ("DS_LISTEN", "Listen", false) });
+             "Turns down harsh 's' and 'sh' sounds in a voice. Drag the Threshold pill to set how loud they must be before they are reduced, and Frequency to where the sibilance lives.",
+             0xFF0F0F0F, 0xFFFFB703, DisplayKind::None, false,
+             { K ("DS_THRESH", "Threshold", -60.0f, 0.0f, -19.0f, "dB", 1),
+               K ("DS_FREQ", "Frequency", 3000.0f, 12000.0f, 9000.0f, "Hz", 0, 9000.0f) });
 
 
         // ------------------------------------------------------------ utility, dynamics, modulation, delay, saturation
@@ -377,11 +381,10 @@ inline const std::vector<FxInfo>& getFxRegistry()
 
         add (ID_Pumper, "Pumper", "PMP",
              "Simulated side-chain compression: the volume ducks on every beat and swells back, the classic pumping dance sound. Locked to the project tempo.",
-             0xFF1F1B2E, 0xFF818CF8, DisplayKind::None, false,
-             { C ("PMP_RATE", "Rate", StringArray { "1/2", "1/4", "1/8", "1/16" }, 1),
-               Pct ("PMP_DEPTH", "Depth", 0.8f),
-               Pct ("PMP_RELEASE", "Release", 0.6f),
-               Pct ("PMP_CURVE", "Curve", 0.5f) });
+             0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
+             { Pct ("PMP_AMOUNT", "Amount", 0.8f),
+               Pct ("PMP_PHASE", "Phase", 0.0f),
+               K ("PMP_TIME", "Time", 0.25f, 4.0f, 1.0f, "x", 2, 1.0f) });
 
         add (ID_AutoPan, "Auto Pan", "APN",
              "Moves the sound between the left and right speakers. Sync locks the movement to the tempo (stereo only).",
@@ -435,23 +438,30 @@ inline const std::vector<FxInfo>& getFxRegistry()
                Pct ("EXC_AMT", "Amount", 0.5f),
                Pct ("EXC_MIX", "Mix", 1.0f) });
 
-        add (ID_FetComp, "FET Compressor", "FET",
+        add (ID_FetComp, "BL 1176", "FET",
              "A fast, punchy compressor in the style of the classic FET limiting amplifier. Input drives the signal into the compressor, Output sets the final level.",
-             0xFF1E2024, 0xFFFB7185, DisplayKind::GainReduction, false,
+             0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
              { K ("FET_INPUT", "Input", 0.0f, 40.0f, 14.0f, "dB", 1),
                K ("FET_OUTPUT", "Output", -24.0f, 12.0f, -6.0f, "dB", 1),
                K ("FET_ATTACK", "Attack", 0.02f, 0.8f, 0.2f, "ms", 2, 0.2f),
                K ("FET_RELEASE", "Release", 50.0f, 1100.0f, 300.0f, "ms", 0, 300.0f),
-               C ("FET_RATIO", "Ratio", StringArray { "4:1", "8:1", "12:1", "20:1", "All" }, 0),
-               Pct ("FET_MIX", "Mix", 1.0f) });
+               C ("FET_RATIO", "Ratio", StringArray { "4:1", "8:1", "12:1", "20:1", "All" }, 2) });
 
-        add (ID_OptoComp, "Opto Compressor", "OPT",
-             "Smooth, musical compression in the style of a classic optical compressor. Peak Reduction sets how much it squeezes, Gain brings the level back up.",
-             0xFF26221B, 0xFFE5C07B, DisplayKind::GainReduction, false,
-             { Pct ("OPT_PEAK", "Peak Reduction", 0.5f),
-               K ("OPT_GAIN", "Gain", 0.0f, 30.0f, 6.0f, "dB", 1),
-               C ("OPT_MODE", "Mode", StringArray { "Compress", "Limit" }, 0),
-               Pct ("OPT_MIX", "Mix", 1.0f) });
+        add (ID_OptoComp, "TecLab BA-2A", "OPT",
+             "Smooth, musical compression in the style of a classic optical leveling amplifier. Squeeze sets how much it compresses, Gain brings the level back up, and Limit mode clamps down harder.",
+             0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
+             { K ("OPT_GAIN", "Gain", 0.0f, 30.0f, 6.0f, "dB", 1),
+               Pct ("OPT_PEAK", "Squeeze", 0.5f),
+               C ("OPT_MODE", "Mode", StringArray { "Compress", "Limit" }, 0) });
+
+        add (ID_FbkComp, "FBK Compressor", "FBK",
+             "A feedback-style compressor: it listens to its own output, which gives a smooth, forgiving squeeze that follows the music. Gain sets the final level.",
+             0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
+             { K ("FBK_ATTACK", "Attack", 0.1f, 100.0f, 10.0f, "ms", 1, 10.0f),
+               K ("FBK_RELEASE", "Release", 10.0f, 1000.0f, 150.0f, "ms", 0, 150.0f),
+               K ("FBK_THRESH", "Threshold", -60.0f, 0.0f, -20.0f, "dB", 1),
+               K ("FBK_RATIO", "Ratio", 1.0f, 20.0f, 4.0f, ": 1", 1, 4.0f),
+               K ("FBK_GAIN", "Gain", -12.0f, 12.0f, 0.0f, "dB", 1) });
 
         add (ID_DelayPlus, "Delay +", "DDP",
              "Rhythmic multi-tap delay. Each pattern drops four echoes on the beat grid, spread across the stereo field.",
@@ -464,25 +474,83 @@ inline const std::vector<FxInfo>& getFxRegistry()
                Pct ("DDP_MIX", "Mix", 0.35f) });
 
         add (ID_FilterEcho, "Filter Echo +", "FEC",
-             "A tempo-synced echo where every repeat passes through a filter, so the echoes get darker, thinner or more resonant as they fade.",
-             0xFF2B1535, 0xFFD946EF, DisplayKind::None, false,
-             { C ("FEC_DIV", "Note", StringArray { "1/4", "1/8", "1/8 dotted", "1/16", "1/2", "1/8 triplet" }, 1),
-               Pct ("FEC_FB", "Feedback", 0.5f),
-               K ("FEC_FREQ", "Filter", 150.0f, 12000.0f, 2000.0f, "Hz", 0, 1500.0f),
-               K ("FEC_RES", "Resonance", 0.5f, 8.0f, 1.5f, "", 1, 1.5f),
-               C ("FEC_TYPE", "Type", StringArray { "Low-pass", "Band-pass", "High-pass" }, 0),
-               Pct ("FEC_MOD", "Modulation", 0.2f),
-               Pct ("FEC_MIX", "Mix", 0.35f) });
+             "A tempo-synced echo where every repeat passes through a low-pass filter, so the echoes get darker as they fade. Drag the Feedback pill up for more repeats.",
+             0xFF121316, 0xFFC026D3, DisplayKind::None, false,
+             { C ("FEC_DIV", "Time", StringArray { "1/4", "1/8", "1/8 dotted", "1/16", "1/2", "1/8 triplet" }, 1),
+               Pct ("FEC_FB", "Feedback", 0.24f),
+               K ("FEC_FREQ", "Cutoff", 150.0f, 12000.0f, 12000.0f, "Hz", 0, 1500.0f),
+               Pct ("FEC_MIX", "Mix", 0.4f) });
 
-        add (ID_LegacyDelay, "D-Delay", "DDL",
-             "A classic delay with separate left and right times and cross-feedback for ping-pong style movement.",
-             0xFF2A2415, 0xFFFDE047, DisplayKind::None, false,
-             { K ("DDL_TL", "Left Time", 1.0f, 2000.0f, 300.0f, "ms", 0, 300.0f),
-               K ("DDL_TR", "Right Time", 1.0f, 2000.0f, 450.0f, "ms", 0, 300.0f),
-               Pct ("DDL_FB", "Feedback", 0.4f),
-               Pct ("DDL_CROSS", "Cross", 0.3f),
-               Pct ("DDL_TONE", "Tone", 0.6f),
-               Pct ("DDL_MIX", "Mix", 0.3f) });
+        add (ID_LegacyDelay, "D-Delay +", "DDX",
+             "A tempo-synced stereo delay with filters in the feedback loop. Spread bounces the repeats between left and right; Wet, Dry and Volume set the balance.",
+             0xFF121316, 0xFF2DD4BF, DisplayKind::None, false,
+             { C ("DDX_TIME", "Time", StringArray { "1/4", "1/8", "1/16", "1/8 dotted", "1/2", "1/8 triplet" }, 0),
+               Pct ("DDX_FB", "Feedback", 0.2f),
+               K ("DDX_HP", "High Pass", 20.0f, 2000.0f, 50.0f, "Hz", 0, 200.0f),
+               K ("DDX_LP", "Low Pass", 1000.0f, 20000.0f, 16000.0f, "Hz", 0, 6000.0f),
+               Pct ("DDX_SPREAD", "Spread", 0.5f),
+               Pct ("DDX_WET", "Wet", 0.5f),
+               Pct ("DDX_DRY", "Dry", 1.0f),
+               K ("DDX_VOL", "Volume", -24.0f, 12.0f, 0.0f, "dB", 0) });
+
+        add (ID_SpringReverb, "Spring Reverb", "SPR",
+             "The splashy, metallic reverb of a spring tank. Drag the Amount pill up for more, and pick a Type for a different tank.",
+             0xFF121316, 0xFFC026D3, DisplayKind::None, false,
+             { Pct ("SPR_AMOUNT", "Amount", 0.5f),
+               C ("SPR_TYPE", "Type", StringArray { "American", "British", "Vintage" }, 0) });
+
+        add (ID_MultiFilter, "Multi Filter", "MF",
+             "One filter, many shapes: low-pass, high-pass, band-pass, notch, peak and shelves. Gain only applies to the peak and shelf shapes.",
+             0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
+             { K ("MF_FREQ", "Frequency", 20.0f, 20000.0f, 1000.0f, "Hz", 0, 1000.0f),
+               K ("MF_RES", "Resonance", 0.3f, 14.0f, 0.7f, "", 2, 1.0f),
+               K ("MF_GAIN", "Gain", -18.0f, 18.0f, 0.0f, "dB", 1),
+               C ("MF_TYPE", "Filter", StringArray { "Lowpass", "Highpass", "Bandpass", "Notch", "Peak", "Low Shelf", "High Shelf" }, 0) });
+
+        add (ID_EzEq, "EZ EQ", "EZ",
+             "A simple three-part EQ: a high-pass on the left, one adjustable bell in the middle, and a low-pass on the right.",
+             0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
+             { K ("EZ_HP", "High Pass", 20.0f, 1000.0f, 20.0f, "Hz", 0, 150.0f),
+               K ("EZ_GAIN", "Gain", -15.0f, 15.0f, 0.0f, "dB", 1),
+               K ("EZ_FREQ", "Frequency", 100.0f, 8000.0f, 1000.0f, "Hz", 0, 1000.0f),
+               K ("EZ_WIDTH", "Width", 0.2f, 4.0f, 1.0f, "", 2, 1.0f),
+               K ("EZ_LP", "Low Pass", 1000.0f, 20000.0f, 20000.0f, "Hz", 0, 5000.0f) });
+
+        add (ID_GraphicEq, "Graphic EQ", "GEQ",
+             "Seven sliders, one for each band from 100 Hz to 6.4 kHz. Push a slider up to boost that band or down to cut it. Level sets the final volume.",
+             0xFFB5AB9D, 0xFF3A342C, DisplayKind::None, false,
+             { K ("GEQ_1", "100", -15.0f, 15.0f, 0.0f, "dB", 1),
+               K ("GEQ_2", "200", -15.0f, 15.0f, 0.0f, "dB", 1),
+               K ("GEQ_3", "400", -15.0f, 15.0f, 0.0f, "dB", 1),
+               K ("GEQ_4", "800", -15.0f, 15.0f, 0.0f, "dB", 1),
+               K ("GEQ_5", "1.6k", -15.0f, 15.0f, 0.0f, "dB", 1),
+               K ("GEQ_6", "3.2k", -15.0f, 15.0f, 0.0f, "dB", 1),
+               K ("GEQ_7", "6.4k", -15.0f, 15.0f, 0.0f, "dB", 1),
+               K ("GEQ_LEVEL", "Level", -12.0f, 12.0f, 0.0f, "dB", 1) });
+
+        add (ID_VintageLimiter, "Vintage Limiter", "VL",
+             "A characterful limiter. Gain pushes into it, Knee softens the onset, and Enhance adds warm saturation. Nothing gets past the ceiling.",
+             0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
+             { K ("VL_GAIN", "Gain", 0.0f, 24.0f, 6.0f, "dB", 1),
+               K ("VL_ATTACK", "Attack", 0.05f, 20.0f, 1.0f, "ms", 2, 1.0f),
+               K ("VL_RELEASE", "Release", 10.0f, 1000.0f, 200.0f, "ms", 0, 200.0f),
+               K ("VL_KNEE", "Knee", 0.0f, 12.0f, 4.0f, "dB", 1),
+               Pct ("VL_ENHANCE", "Enhance", 0.0f),
+               K ("VL_VOL", "Volume", -12.0f, 12.0f, 0.0f, "dB", 1) });
+
+        add (ID_Eq3M, "EQ3-M", "EQ3",
+             "A classic three-band tone control with a sweepable mid. Mid Sweep chooses which mid frequencies the Mid knob boosts or cuts.",
+             0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
+             { K ("EQ3_LOW", "Low", -12.0f, 12.0f, 0.0f, "dB", 1),
+               K ("EQ3_MID", "Mid", -12.0f, 12.0f, 0.0f, "dB", 1),
+               K ("EQ3_HIGH", "High", -12.0f, 12.0f, 0.0f, "dB", 1),
+               Pct ("EQ3_SWEEP", "Mid Sweep", 0.5f) });
+
+        add (ID_GtrSqueeze, "GTR Squeeze", "GSQ",
+             "Makes guitar notes sustain by squeezing the level. Turn Sustain up for longer, even notes and Volume to set how loud it comes out.",
+             0xFF4B5263, 0xFFFFFFFF, DisplayKind::None, false,
+             { Pct ("GSQ_SUSTAIN", "Sustain", 0.5f),
+               K ("GSQ_VOL", "Volume", -12.0f, 12.0f, 0.0f, "dB", 1) });
 
         return r;
     }();
@@ -553,7 +621,7 @@ inline juce::String formatSpecValue(const ParamSpec& s, float real)
         default: break;
     }
     const float d = real * s.scale;
-    if (s.unit == "Hz" && std::abs(d) >= 1000.0f) return juce::String(d / 1000.0f, 2) + " kHz";
+    if (s.unit == "Hz" && std::abs(d) >= 1000.0f) return juce::String((int) std::lround(d)) + " Hz";
     if (s.unit.isEmpty()) return juce::String(d, s.decimals);
     if (s.unit == "%")    return juce::String(d, s.decimals) + "%";
     return juce::String(d, s.decimals) + " " + s.unit;

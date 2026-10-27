@@ -76,7 +76,7 @@ private:
 class PumperFx : public Processor
 {
 public:
-    explicit PumperFx (Bank& s) : rate (s, "PMP_RATE"), depth (s, "PMP_DEPTH"), rel (s, "PMP_RELEASE"), curve (s, "PMP_CURVE") {}
+    explicit PumperFx (Bank& s) : rate (s, "PMP_TIME"), depth (s, "PMP_AMOUNT"), phaseOff (s, "PMP_PHASE") {}
 
     void prepare (double sampleRate, int) override { sr = sampleRate > 1000.0 ? sampleRate : 44100.0; smC = timeToCoef (sr, 1.5f); reset(); }
     void reset() override { g = 1.0f; freePhase = 0.0; }
@@ -87,14 +87,13 @@ public:
         const int n = buffer.getNumSamples();
         if (numCh == 0) return;
 
-        static const double cyclesPerBeat[4] = { 0.5, 1.0, 2.0, 4.0 };       // 1/2, 1/4, 1/8, 1/16
-        const double cyc = cyclesPerBeat[std::clamp (rate.index(), 0, 3)];
+        const double cyc = std::clamp ((double) rate(), 0.25, 4.0);             // pumps per beat
         const double inc = safeBpm (ctx.bpm) / 60.0 / sr * cyc;
-        double p = (ctx.hasPpq && ctx.playing) ? wrap01 (ctx.ppq * cyc) : freePhase;
+        const double off = std::clamp ((double) phaseOff(), 0.0, 1.0);
+        double p = (ctx.hasPpq && ctx.playing) ? wrap01 (ctx.ppq * cyc + off) : freePhase;
 
         const float d = std::clamp (depth(), 0.0f, 1.0f);
-        const float relF = 0.1f + 0.85f * std::clamp (rel(), 0.0f, 1.0f);
-        const float expo = 0.4f + 3.2f * std::clamp (curve(), 0.0f, 1.0f);
+        const float relF = 0.6f, expo = 1.8f;
 
         for (int i = 0; i < n; ++i)
         {
@@ -108,7 +107,7 @@ public:
     }
 
 private:
-    Param rate, depth, rel, curve;
+    Param rate, depth, phaseOff;
     double sr = 44100.0, freePhase = 0.0;
     float smC = 0.0f, g = 1.0f;
 };
@@ -393,7 +392,7 @@ class FetCompFx : public Processor
 public:
     explicit FetCompFx (Bank& s)
         : input (s, "FET_INPUT"), output (s, "FET_OUTPUT"), attack (s, "FET_ATTACK"), release (s, "FET_RELEASE"),
-          ratio (s, "FET_RATIO"), mix (s, "FET_MIX") {}
+          ratio (s, "FET_RATIO") {}
 
     void prepare (double sampleRate, int) override { sr = sampleRate > 1000.0 ? sampleRate : 44100.0; core.thresholdDb = -10.0f; core.kneeDb = 1.0f; reset(); }
     void reset() override { core.reset(); meter = 0.0f; }
@@ -407,7 +406,7 @@ public:
         static const float ratios[5] = { 4.0f, 8.0f, 12.0f, 20.0f, 60.0f };
         core.ratio = ratios[std::clamp (ratio.index(), 0, 4)];
         core.setTimes (sr, std::max (attack(), 0.01f), std::max (release(), 20.0f));
-        const float inG = dbToGain (input()), outG = dbToGain (output()), m = std::clamp (mix(), 0.0f, 1.0f);
+        const float inG = dbToGain (input()), outG = dbToGain (output());
         float worst = 0.0f;
 
         for (int i = 0; i < n; ++i)
@@ -420,7 +419,7 @@ public:
             for (int ch = 0; ch < numCh; ++ch)
             {
                 float* x = buffer.getWritePointer (ch);
-                x[i] = x[i] * (1.0f - m) + sanitise (x[i]) * gain * m;
+                x[i] = sanitise (x[i]) * gain;
             }
         }
         meter = std::max (worst, meter * 0.9f);
@@ -429,7 +428,7 @@ public:
     float getMeter() const noexcept override { return meter; }
 
 private:
-    Param input, output, attack, release, ratio, mix;
+    Param input, output, attack, release, ratio;
     double sr = 44100.0;
     CompCore core;
     float meter = 0.0f;
@@ -439,7 +438,7 @@ private:
 class OptoCompFx : public Processor
 {
 public:
-    explicit OptoCompFx (Bank& s) : peakRed (s, "OPT_PEAK"), gain (s, "OPT_GAIN"), mode (s, "OPT_MODE"), mix (s, "OPT_MIX") {}
+    explicit OptoCompFx (Bank& s) : peakRed (s, "OPT_PEAK"), gain (s, "OPT_GAIN"), mode (s, "OPT_MODE") {}
 
     void prepare (double sampleRate, int) override
     {
@@ -458,7 +457,7 @@ public:
 
         core.thresholdDb = -2.0f - 36.0f * std::clamp (peakRed(), 0.0f, 1.0f);
         core.ratio = mode.index() == 1 ? 10.0f : 3.0f;
-        const float outG = dbToGain (gain()), m = std::clamp (mix(), 0.0f, 1.0f);
+        const float outG = dbToGain (gain());
         float worst = 0.0f;
 
         for (int i = 0; i < n; ++i)
@@ -474,7 +473,7 @@ public:
             for (int ch = 0; ch < numCh; ++ch)
             {
                 float* x = buffer.getWritePointer (ch);
-                x[i] = x[i] * (1.0f - m) + sanitise (x[i]) * g * m;
+                x[i] = sanitise (x[i]) * g;
             }
         }
         meter = std::max (worst, meter * 0.9f);
@@ -483,10 +482,60 @@ public:
     float getMeter() const noexcept override { return meter; }
 
 private:
-    Param peakRed, gain, mode, mix;
+    Param peakRed, gain, mode;
     double sr = 44100.0;
     CompCore core;
     float attC = 0.0f, relFast = 0.0f, relSlow = 0.0f, fast = 0.0f, slow = 0.0f, meter = 0.0f;
+};
+
+// ======================================================================= FBK Compressor (feedback-topology)
+// The level detector listens to the compressor's own output, which gives the gentle, program-dependent
+// squeeze of vintage feedback designs.
+class FbkCompFx : public Processor
+{
+public:
+    explicit FbkCompFx (Bank& s)
+        : attack (s, "FBK_ATTACK"), release (s, "FBK_RELEASE"), thresh (s, "FBK_THRESH"), ratio (s, "FBK_RATIO"), gain (s, "FBK_GAIN") {}
+
+    void prepare (double sampleRate, int) override { sr = sampleRate > 1000.0 ? sampleRate : 44100.0; core.kneeDb = 8.0f; reset(); }
+    void reset() override { core.reset(); last = 0.0f; meter = 0.0f; }
+
+    void process (juce::AudioBuffer<float>& buffer, const Context&) override
+    {
+        const int numCh = std::min (buffer.getNumChannels(), kMaxCh);
+        const int n = buffer.getNumSamples();
+        if (numCh == 0) return;
+
+        core.thresholdDb = thresh();
+        core.ratio = std::max (ratio(), 1.0f) * 2.6f;            // feedback detection is gentler, so it needs a little more ratio
+        core.setTimes (sr, std::max (attack(), 0.05f), std::max (release(), 10.0f));
+        const float outG = dbToGain (gain());
+        float worst = 0.0f;
+
+        for (int i = 0; i < n; ++i)
+        {
+            const float gr = core.tick (last);
+            worst = std::max (worst, -gr);
+            const float g = dbToGain (gr) * outG;
+            float peak = 0.0f;
+            for (int ch = 0; ch < numCh; ++ch)
+            {
+                float* x = buffer.getWritePointer (ch);
+                x[i] = sanitise (x[i]) * g;
+                peak = std::max (peak, std::abs (x[i]));
+            }
+            last = peak / std::max (outG, 1.0e-3f);              // detector sees the compressed signal, before make-up gain
+        }
+        meter = std::max (worst, meter * 0.9f);
+    }
+
+    float getMeter() const noexcept override { return meter; }
+
+private:
+    Param attack, release, thresh, ratio, gain;
+    double sr = 44100.0;
+    CompCore core;
+    float last = 0.0f, meter = 0.0f;
 };
 
 // ======================================================================= Delay + (rhythmic multi-tap)
@@ -569,7 +618,7 @@ class FilterEchoFx : public Processor
 {
 public:
     explicit FilterEchoFx (Bank& s)
-        : div (s, "FEC_DIV"), fb (s, "FEC_FB"), freq (s, "FEC_FREQ"), res (s, "FEC_RES"), type (s, "FEC_TYPE"), mod (s, "FEC_MOD"), mix (s, "FEC_MIX") {}
+        : div (s, "FEC_DIV"), fb (s, "FEC_FB"), freq (s, "FEC_FREQ"), mix (s, "FEC_MIX") {}
 
     void prepare (double sampleRate, int) override
     {
@@ -593,10 +642,9 @@ public:
         mixSm.setTargetValue (std::clamp (mix(), 0.0f, 1.0f));
 
         const float feedback = std::clamp (fb(), 0.0f, 0.92f);
-        const float k = 1.0f / std::clamp (res(), 0.5f, 8.0f);
+        const float k = 1.0f / 1.2f;
         const float g = Svf::gFor (freq(), sr);
-        const int t = std::clamp (type.index(), 0, 2);
-        const float modSamples = std::clamp (mod(), 0.0f, 1.0f) * (float) (sr * 0.004);
+        const float modSamples = 0.01f * (float) (sr * 0.004);
         const double inc = 0.35 / sr;
 
         for (int i = 0; i < n; ++i)
@@ -610,7 +658,8 @@ public:
                 const float in = sanitise (buffer.getReadPointer (ch)[i]);
                 float lo, bp, hi;
                 svf.process (ch, dl.read (ch, d), g, k, lo, bp, hi);
-                const float f = sanitise (t == 0 ? lo : (t == 1 ? bp * k * 1.6f : hi));
+                const float f = sanitise (lo);
+                (void) bp; (void) hi;
                 dl.push (ch, in + feedback * f);
                 buffer.getWritePointer (ch)[i] = in + f * m;
             }
@@ -619,63 +668,11 @@ public:
     }
 
 private:
-    Param div, fb, freq, res, type, mod, mix;
+    Param div, fb, freq, mix;
     double sr = 44100.0, phase = 0.0;
     DelayLine dl;
     Svf svf;
     Smooth delaySm, mixSm;
-};
-
-// ======================================================================= Delay (legacy, independent L / R)
-class LegacyDelayFx : public Processor
-{
-public:
-    explicit LegacyDelayFx (Bank& s)
-        : tl (s, "DDL_TL"), tr (s, "DDL_TR"), fb (s, "DDL_FB"), cross (s, "DDL_CROSS"), tone (s, "DDL_TONE"), mix (s, "DDL_MIX") {}
-
-    void prepare (double sampleRate, int) override
-    {
-        sr = sampleRate > 1000.0 ? sampleRate : 44100.0;
-        dl.prepare ((int) (sr * 2.2));
-        initSmooth (tlSm, sr, 0.08, 0.3f * (float) sr);  initSmooth (trSm, sr, 0.08, 0.45f * (float) sr);
-        initSmooth (mixSm, sr, 0.02, mix());
-        reset();
-    }
-    void reset() override { dl.clear(); lp[0].reset(); lp[1].reset(); }
-
-    void process (juce::AudioBuffer<float>& buffer, const Context&) override
-    {
-        const int numCh = std::min (buffer.getNumChannels(), kMaxCh);
-        const int n = buffer.getNumSamples();
-        if (numCh == 0) return;
-
-        tlSm.setTargetValue ((float) (std::clamp (tl(), 1.0f, 2000.0f) * 0.001 * sr));
-        trSm.setTargetValue ((float) (std::clamp (tr(), 1.0f, 2000.0f) * 0.001 * sr));
-        mixSm.setTargetValue (std::clamp (mix(), 0.0f, 1.0f));
-        const float feedback = std::clamp (fb(), 0.0f, 0.92f), x = std::clamp (cross(), 0.0f, 1.0f);
-        const float lpC = onePoleCoef (sr, 500.0f * std::pow (32.0f, std::clamp (tone(), 0.0f, 1.0f)));
-
-        for (int i = 0; i < n; ++i)
-        {
-            const float dL = tlSm.getNextValue(), dR = trSm.getNextValue(), m = mixSm.getNextValue();
-            const float inL = sanitise (buffer.getReadPointer (0)[i]);
-            const float inR = numCh > 1 ? sanitise (buffer.getReadPointer (1)[i]) : inL;
-            const float wL = dl.read (0, dL), wR = dl.read (1, numCh > 1 ? dR : dL);
-            const float fL = lp[0].process (0, wL, lpC), fR = lp[1].process (1, wR, lpC);
-            dl.push (0, inL + feedback * ((1.0f - x) * fL + x * fR));
-            dl.push (1, inR + feedback * ((1.0f - x) * fR + x * fL));
-            dl.advance();
-            buffer.getWritePointer (0)[i] = inL + wL * m;
-            if (numCh > 1) buffer.getWritePointer (1)[i] = inR + wR * m;
-        }
-    }
-
-private:
-    Param tl, tr, fb, cross, tone, mix;
-    double sr = 44100.0;
-    DelayLine dl;
-    OnePoleLP lp[2];
-    Smooth tlSm, trSm, mixSm;
 };
 
 } // namespace fx

@@ -10,7 +10,7 @@ inline float semitonesToRatio (float st) noexcept { return std::pow (2.0f, st / 
 class PitchShifterFx : public Processor
 {
 public:
-    explicit PitchShifterFx (Bank& s) : semi (s, "PS_SEMI"), fine (s, "PS_FINE"), mix (s, "PS_MIX") {}
+    explicit PitchShifterFx (Bank& s) : type (s, "PS_TYPE"), semi (s, "PS_SHIFT"), mix (s, "PS_MIX") {}
 
     void prepare (double sampleRate, int) override
     {
@@ -28,7 +28,8 @@ public:
         const int n = buffer.getNumSamples();
         if (numCh == 0) return;
 
-        ratioSm.setTargetValue (semitonesToRatio (std::round (semi()) + fine() * 0.01f));
+        shifter.setWindowSeconds (windowFor (type.index()), sr);
+        ratioSm.setTargetValue (semitonesToRatio (std::clamp (semi(), -12.0f, 12.0f)));
         mixSm.setTargetValue (std::clamp (mix(), 0.0f, 1.0f));
 
         for (int i = 0; i < n; ++i)
@@ -44,26 +45,36 @@ public:
         }
     }
 
+    static double windowFor (int inputType) noexcept
+    {
+        static const double w[3] = { 0.060, 0.045, 0.025 };      // Vocal, Instrument, Drums
+        return w[std::clamp (inputType, 0, 2)];
+    }
+
 private:
-    Param semi, fine, mix;
+    Param type, semi, mix;
     double sr = 44100.0;
     PitchShifter shifter;
     Smooth ratioSm, mixSm;
 };
 
 // ======================================================================= Multi Shifter
+// Six fixed harmony voices (octave, fifth and fourth, above and below), each with its own level.
 class MultiShifterFx : public Processor
 {
 public:
+    static constexpr int kVoices = 6;
+
     explicit MultiShifterFx (Bank& s)
-        : p { Param (s, "MS_P1"), Param (s, "MS_P2"), Param (s, "MS_P3") },
-          l { Param (s, "MS_L1"), Param (s, "MS_L2"), Param (s, "MS_L3") },
-          dry (s, "MS_DRY"), spread (s, "MS_SPREAD") {}
+        : type (s, "MS_TYPE"),
+          lvl { Param (s, "MS_OCTUP"), Param (s, "MS_FIFTHUP"), Param (s, "MS_FOURTHUP"),
+                Param (s, "MS_OCTDN"), Param (s, "MS_FIFTHDN"), Param (s, "MS_FOURTHDN") },
+          dry (s, "MS_DRY") {}
 
     void prepare (double sampleRate, int) override
     {
         sr = sampleRate > 1000.0 ? sampleRate : 44100.0;
-        for (int v = 0; v < 3; ++v) { sh[v].prepare (sr); initSmooth (ratioSm[v], sr, 0.03, 1.0f); initSmooth (levelSm[v], sr, 0.02, l[v]()); }
+        for (int v = 0; v < kVoices; ++v) { sh[v].prepare (sr); initSmooth (levelSm[v], sr, 0.02, lvl[v]()); }
         initSmooth (drySm, sr, 0.02, dry());
         reset();
     }
@@ -71,49 +82,43 @@ public:
 
     void process (juce::AudioBuffer<float>& buffer, const Context&) override
     {
+        static const float semis[kVoices] = { 12.0f, 7.0f, 5.0f, -12.0f, -7.0f, -5.0f };
         const int numCh = std::min (buffer.getNumChannels(), kMaxCh);
         const int n = buffer.getNumSamples();
         if (numCh == 0) return;
 
-        const float sp = std::clamp (spread(), 0.0f, 1.0f);
-        float gl[3], gr[3];
-        const float pos[3] = { -1.0f, 0.0f, 1.0f };
-        for (int v = 0; v < 3; ++v)
+        float ratio[kVoices];
+        for (int v = 0; v < kVoices; ++v)
         {
-            ratioSm[v].setTargetValue (semitonesToRatio (std::round (p[v]())));
-            levelSm[v].setTargetValue (std::clamp (l[v](), 0.0f, 1.0f));
-            const float a = (pos[v] * sp + 1.0f) * kPi * 0.25f;      // equal-power pan
-            gl[v] = std::cos (a) * 1.4142f;  gr[v] = std::sin (a) * 1.4142f;
+            ratio[v] = semitonesToRatio (semis[v]);
+            levelSm[v].setTargetValue (std::clamp (lvl[v](), 0.0f, 1.0f));
+            sh[v].setWindowSeconds (PitchShifterFx::windowFor (type.index()), sr);
         }
         drySm.setTargetValue (std::clamp (dry(), 0.0f, 1.0f));
 
         for (int i = 0; i < n; ++i)
         {
             const float dg = drySm.getNextValue();
-            float inS[kMaxCh] {};
-            for (int ch = 0; ch < numCh; ++ch) inS[ch] = sanitise (buffer.getReadPointer (ch)[i]);
+            float inS[kMaxCh] {}, out[kMaxCh] {};
+            for (int ch = 0; ch < numCh; ++ch) { inS[ch] = sanitise (buffer.getReadPointer (ch)[i]); out[ch] = inS[ch] * dg; }
 
-            float wetL = 0.0f, wetR = 0.0f;
-            for (int v = 0; v < 3; ++v)
+            for (int v = 0; v < kVoices; ++v)
             {
-                const float lv = levelSm[v].getNextValue(), ratio = ratioSm[v].getNextValue();
+                const float lv = levelSm[v].getNextValue();
                 for (int ch = 0; ch < numCh; ++ch) sh[v].push (ch, inS[ch]);
-                const float a = sh[v].read (0) * lv;
-                const float b = numCh > 1 ? sh[v].read (1) * lv : a;
-                sh[v].advance (ratio);
-                if (numCh > 1) { wetL += a * gl[v]; wetR += b * gr[v]; }
-                else           { wetL += a; }
+                if (lv > 0.0005f)
+                    for (int ch = 0; ch < numCh; ++ch) out[ch] += sh[v].read (ch) * lv;
+                sh[v].advance (ratio[v]);
             }
-            buffer.getWritePointer (0)[i] = inS[0] * dg + wetL;
-            if (numCh > 1) buffer.getWritePointer (1)[i] = inS[1] * dg + wetR;
+            for (int ch = 0; ch < numCh; ++ch) buffer.getWritePointer (ch)[i] = out[ch];
         }
     }
 
 private:
-    Param p[3], l[3], dry, spread;
+    Param type, lvl[kVoices], dry;
     double sr = 44100.0;
-    PitchShifter sh[3];
-    Smooth ratioSm[3], levelSm[3], drySm;
+    PitchShifter sh[kVoices];
+    Smooth levelSm[kVoices], drySm;
 };
 
 // ======================================================================= Dual Octaver
@@ -324,7 +329,7 @@ private:
 class FeedbackKillerFx : public Processor
 {
 public:
-    explicit FeedbackKillerFx (Bank& s) : sens (s, "FK_SENS"), depth (s, "FK_DEPTH") {}
+    explicit FeedbackKillerFx (Bank& s) : amount (s, "FK_AMOUNT") {}
 
     void prepare (double sampleRate, int) override
     {
@@ -458,7 +463,9 @@ private:
         }
     }
 
-    Param sens, depth;
+    Param amount;                                        // one knob drives both how eagerly it listens and how deep the notch is
+    float sens()  const noexcept { return std::clamp (amount(), 0.0f, 1.0f); }
+    float depth() const noexcept { return 12.0f + 24.0f * std::clamp (amount(), 0.0f, 1.0f); }
     double sr = 44100.0;
     juce::dsp::FFT fft { 11 };
     std::vector<float> fftData, ring, window, mags;
@@ -472,7 +479,7 @@ private:
 class DeEsserFx : public Processor
 {
 public:
-    explicit DeEsserFx (Bank& s) : freq (s, "DS_FREQ"), thresh (s, "DS_THRESH"), amount (s, "DS_AMOUNT"), listen (s, "DS_LISTEN") {}
+    explicit DeEsserFx (Bank& s) : freq (s, "DS_FREQ"), thresh (s, "DS_THRESH") {}
 
     void prepare (double sampleRate, int) override
     {
@@ -492,8 +499,7 @@ public:
         const float fc = clampFreq (freq(), sr);
         hp.highpass (sr, fc);  lp.lowpass (sr, fc);
         const float thr = thresh();
-        const float maxRed = std::clamp (amount(), 0.0f, 1.0f) * 20.0f;
-        const bool solo = listen.on();
+        const float maxRed = 18.0f;
         float worst = 0.0f;
 
         for (int i = 0; i < n; ++i)
@@ -515,7 +521,7 @@ public:
             const float g = dbToGain (gDb);
 
             for (int ch = 0; ch < numCh; ++ch)
-                buffer.getWritePointer (ch)[i] = solo ? band[ch] * g : low[ch] + band[ch] * g;
+                buffer.getWritePointer (ch)[i] = low[ch] + band[ch] * g;
         }
         meter = std::max (worst, meter * 0.9f);
     }
@@ -523,7 +529,7 @@ public:
     float getMeter() const noexcept override { return meter; }
 
 private:
-    Param freq, thresh, amount, listen;
+    Param freq, thresh;
     double sr = 44100.0;
     LR4 hp, lp;                    // Linkwitz-Riley split: low + high sums back to the original
     EnvFollower env;

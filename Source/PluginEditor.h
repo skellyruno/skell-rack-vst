@@ -52,6 +52,14 @@ public:
     void paint(juce::Graphics& g) override { g.fillAll(juce::Colour(0xFF14151A)); }
 };
 
+// The whole interface is laid out at a fixed "native" size and scaled to the window, so resizing never rearranges anything.
+class UiCanvas : public juce::Component
+{
+public:
+    std::function<void(juce::Graphics&)> onPaint;
+    void paint(juce::Graphics& g) override { if (onPaint) onPaint(g); }
+};
+
 class ModularFXAudioProcessorEditor : public juce::AudioProcessorEditor,
                                       private juce::ChangeListener
 {
@@ -59,11 +67,13 @@ public:
     explicit ModularFXAudioProcessorEditor(ModularFXAudioProcessor& p);
     ~ModularFXAudioProcessorEditor() override;
 
-    void paint(juce::Graphics& g) override;
+    void paint(juce::Graphics& g) override { g.fillAll(juce::Colour(0xFF0F1013)); }
     void resized() override;
 
 private:
     void changeListenerCallback(juce::ChangeBroadcaster*) override { layoutRack(); }
+    void paintNative(juce::Graphics& g);
+    void layoutNative();
     void layoutRack();
     void showAddMenu();
     void closeBrowser();
@@ -76,6 +86,7 @@ private:
 
     ModularFXAudioProcessor& audioProcessor;
     std::vector<int> dragOrder;      // slots, working order while a card is being dragged
+    UiCanvas content;                // everything lives in here at native size
 
     // Declaration order matters: cards are destroyed first, then the viewport, then the rack they live in.
     PresetPanel presetPanel;

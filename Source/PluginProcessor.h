@@ -68,6 +68,8 @@ public:
     // Sent (asynchronously, on the message thread) when a saved project restores a different rack.
     juce::ChangeBroadcaster rackChanged;
 
+    std::atomic<float> uiScale { 0.75f };      // editor size relative to the full-size layout (remembered with the project)
+
 private:
     static constexpr int kSlots = kMaxRack;
 
@@ -96,7 +98,7 @@ private:
     // master section (after the rack)
     enum { kBlend, kVol, kPan, kRev, kByp, kNumMaster };
     std::array<std::atomic<float>*, kNumMaster> masterRaw {};
-    juce::AudioBuffer<float> dryBuf;
+    juce::AudioBuffer<float> dryBuf, preBuf;
     ReverbCoreHolder reverbHolder;
     fx::Smooth blendSm, volSm, panLSm, panRSm, revSm;
     void processChunk (juce::AudioBuffer<float>& buf, const fx::Context& ctx);

@@ -2,25 +2,37 @@
 
 namespace { constexpr int kTopBar = 46; constexpr int kPad = 10; constexpr int kLeftW = 200; constexpr int kRightW = 150; constexpr int kCentreW = 880; }
 
+namespace { constexpr int kNativeW = kLeftW + kCentreW + kRightW; constexpr int kNativeH = kTopBar + kCardH + 2 * kPad + 12; }
+
 ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProcessor& p)
     : AudioProcessorEditor(&p), audioProcessor(p), presetPanel(p), outputPanel(p)
 {
-    addAndMakeVisible(presetPanel);
-    addAndMakeVisible(outputPanel);
+    content.onPaint = [this](juce::Graphics& g) { paintNative(g); };
+    addAndMakeVisible(content);
+
+    content.addAndMakeVisible(presetPanel);
+    content.addAndMakeVisible(outputPanel);
     viewport.setViewedComponent(&rack, false);
     viewport.setScrollBarsShown(false, true);
     viewport.setScrollBarThickness(10);
-    addAndMakeVisible(viewport);
+    content.addAndMakeVisible(viewport);
 
     rack.addChildComponent(addTile);
     addTile.onClick = [this] { showAddMenu(); };
 
     browser.onPick  = [this](const FxCatalogEntry& entry) { addModule(entry); };
     browser.onClose = [this] { closeBrowser(); };
-    addChildComponent(browser);
+    content.addChildComponent(browser);
 
+    layoutNative();
     audioProcessor.rackChanged.addChangeListener(this);
-    setSize(kLeftW + kCentreW + kRightW, kTopBar + kCardH + 2 * kPad + 12);
+
+    // resizable, always keeping the shape of the design; starts 25% smaller than the full-size layout
+    const float scale = juce::jlimit(0.5f, 1.5f, audioProcessor.uiScale.load());
+    setResizable(true, true);
+    setResizeLimits(kNativeW / 2, kNativeH / 2, kNativeW * 3 / 2, kNativeH * 3 / 2);
+    if (auto* cb = getConstrainer()) cb->setFixedAspectRatio((double) kNativeW / (double) kNativeH);
+    setSize(juce::roundToInt((float) kNativeW * scale), juce::roundToInt((float) kNativeH * scale));
     layoutRack();
 }
 
@@ -29,12 +41,11 @@ ModularFXAudioProcessorEditor::~ModularFXAudioProcessorEditor()
     audioProcessor.rackChanged.removeChangeListener(this);
 }
 
-void ModularFXAudioProcessorEditor::paint(juce::Graphics& g)
+void ModularFXAudioProcessorEditor::paintNative(juce::Graphics& g)
 {
-    if (getWidth() <= 0 || getHeight() <= 0) return;
     g.fillAll(juce::Colour(0xFF0F1013));
     g.setColour(juce::Colour(0xFF24262B));
-    g.drawHorizontalLine(kTopBar - 1, 0.0f, (float) getWidth());
+    g.drawHorizontalLine(kTopBar - 1, 0.0f, (float) kNativeW);
     g.setColour(juce::Colours::white);
     g.setFont(juce::Font(juce::FontOptions(18.0f, juce::Font::bold)));
     g.drawText("Modular FX Suite", 16, 8, 220, 30, juce::Justification::centredLeft);
@@ -45,13 +56,21 @@ void ModularFXAudioProcessorEditor::paint(juce::Graphics& g)
                240, 8, 120, 30, juce::Justification::centredLeft);
 }
 
+void ModularFXAudioProcessorEditor::layoutNative()
+{
+    content.setBounds(0, 0, kNativeW, kNativeH);
+    presetPanel.setBounds(0, kTopBar, kLeftW, kNativeH - kTopBar);
+    outputPanel.setBounds(kNativeW - kRightW, kTopBar, kRightW, kNativeH - kTopBar);
+    viewport.setBounds(kLeftW, kTopBar, kNativeW - kLeftW - kRightW, kNativeH - kTopBar);
+    browser.setBounds(0, 0, kNativeW, kNativeH);
+}
+
 void ModularFXAudioProcessorEditor::resized()
 {
-    presetPanel.setBounds(0, kTopBar, kLeftW, getHeight() - kTopBar);
-    outputPanel.setBounds(getWidth() - kRightW, kTopBar, kRightW, getHeight() - kTopBar);
-    viewport.setBounds(kLeftW, kTopBar, getWidth() - kLeftW - kRightW, getHeight() - kTopBar);
-    browser.setBounds(getLocalBounds());
-    layoutRack();
+    if (getWidth() <= 0) return;
+    const float scale = (float) getWidth() / (float) kNativeW;
+    content.setTransform(juce::AffineTransform::scale(scale));
+    audioProcessor.uiScale.store(scale);
 }
 
 void ModularFXAudioProcessorEditor::layoutRack()
@@ -105,7 +124,7 @@ void ModularFXAudioProcessorEditor::layoutRack()
 void ModularFXAudioProcessorEditor::showAddMenu()
 {
     if ((int) audioProcessor.getRack().size() >= kMaxRack) return;
-    browser.setBounds(getLocalBounds());
+    browser.setBounds(0, 0, kNativeW, kNativeH);
     browser.open();
 }
 

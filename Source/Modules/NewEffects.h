@@ -69,13 +69,12 @@ class CompressorFx : public Processor
 public:
     explicit CompressorFx (Bank& s)
         : thresh (s, "COMP_THRESH"), ratio (s, "COMP_RATIO"), attack (s, "COMP_ATTACK"),
-          release (s, "COMP_RELEASE"), makeup (s, "COMP_MAKEUP"), mix (s, "COMP_MIX") {}
+          release (s, "COMP_RELEASE"), knee (s, "COMP_KNEE") {}
 
     void prepare (double sampleRate, int) override
     {
         sr = sampleRate > 1000.0 ? sampleRate : 44100.0;
-        initSmooth (mixSm, sr, 0.02, mix());
-        initSmooth (makeupSm, sr, 0.02, makeup());
+        initSmooth (makeupSm, sr, 0.05, 0.0f);
         reset();
     }
     void reset() override { core.reset(); meter.store (0.0f); }
@@ -89,8 +88,9 @@ public:
         core.thresholdDb = thresh();
         core.ratio = std::max (ratio(), 1.0f);
         core.setTimes (sr, attack(), release());
-        mixSm.setTargetValue (std::clamp (mix(), 0.0f, 1.0f));
-        makeupSm.setTargetValue (makeup());
+        core.kneeDb = std::clamp (knee(), 0.1f, 24.0f);
+        // gentle automatic make-up so that squashing the signal doesn't just make it quieter
+        makeupSm.setTargetValue (-0.4f * std::min (0.0f, thresh()) * (1.0f - 1.0f / core.ratio));
 
         float worst = 0.0f;
         for (int i = 0; i < n; ++i)
@@ -101,12 +101,11 @@ public:
             const float gr = core.tick (peak);
             worst = std::min (worst, gr);
             const float g = dbToGain (gr + makeupSm.getNextValue());
-            const float m = mixSm.getNextValue();
 
             for (int ch = 0; ch < numCh; ++ch)
             {
                 float* d = buffer.getWritePointer (ch);
-                d[i] = d[i] * (1.0f - m) + d[i] * g * m;
+                d[i] = sanitise (d[i]) * g;
             }
         }
         meter.store (-worst, std::memory_order_relaxed);
@@ -115,10 +114,10 @@ public:
     float getMeter() const noexcept override { return meter.load (std::memory_order_relaxed); }
 
 private:
-    Param thresh, ratio, attack, release, makeup, mix;
+    Param thresh, ratio, attack, release, knee;
     double sr = 44100.0;
     CompCore core;
-    Smooth mixSm, makeupSm;
+    Smooth makeupSm;
     std::atomic<float> meter { 0.0f };
 };
 

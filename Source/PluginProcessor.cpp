@@ -4,6 +4,7 @@
 #include "Modules/NewEffects.h"
 #include "Modules/MoreEffects.h"
 #include "Modules/ExtraEffects.h"
+#include "Modules/BandLabFx.h"
 
 namespace
 {
@@ -53,7 +54,15 @@ namespace
             case ID_OptoComp: return std::make_unique<fx::OptoCompFx> (s);
             case ID_DelayPlus: return std::make_unique<fx::DelayPlusFx> (s);
             case ID_FilterEcho: return std::make_unique<fx::FilterEchoFx> (s);
-            case ID_LegacyDelay: return std::make_unique<fx::LegacyDelayFx> (s);
+            case ID_LegacyDelay: return std::make_unique<fx::DDelayPlusFx> (s);
+            case ID_SpringReverb: return std::make_unique<fx::SpringReverbFx> (s);
+            case ID_MultiFilter: return std::make_unique<fx::MultiFilterFx> (s);
+            case ID_EzEq: return std::make_unique<fx::EzEqFx> (s);
+            case ID_GraphicEq: return std::make_unique<fx::GraphicEqFx> (s);
+            case ID_VintageLimiter: return std::make_unique<fx::VintageLimiterFx> (s);
+            case ID_Eq3M: return std::make_unique<fx::Eq3MFx> (s);
+            case ID_GtrSqueeze: return std::make_unique<fx::GtrSqueezeFx> (s);
+            case ID_FbkComp: return std::make_unique<fx::FbkCompFx> (s);
             default:            return nullptr;
         }
     }
@@ -126,6 +135,7 @@ ModularFXAudioProcessor::ModularFXAudioProcessor()
     masterRaw[kRev]   = apvts.getRawParameterValue ("M_REV");
     masterRaw[kByp]   = apvts.getRawParameterValue ("M_BYP");
     dryBuf.setSize (2, 512);
+    preBuf.setSize (2, 512);
 
     // Default rack: the original three effects.
     commitRack ({ { 0, ID_Reverser }, { 1, ID_NoiseGate }, { 2, ID_Chorus } }, true);
@@ -346,6 +356,7 @@ void ModularFXAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBl
     wasRunning.fill (false);
 
     dryBuf.setSize (2, juce::jmax (1, samplesPerBlock), false, false, true);
+    preBuf.setSize (2, juce::jmax (1, samplesPerBlock), false, false, true);
     reverbHolder.core.prepare (sampleRate);
     reverbHolder.core.setParams (0.55f, 0.55f, 1.0f);
     fx::initSmooth (blendSm, sampleRate, 0.02, masterRaw[kBlend]->load());
@@ -422,11 +433,31 @@ void ModularFXAudioProcessor::processChunk (juce::AudioBuffer<float>& buf, const
             const int slot = audioOrder[(size_t) i];
             auto* e = slotFx[(size_t) slot].get();
             auto* on = onRaw[(size_t) slot];
-            if (e == nullptr || on == nullptr || on->load (std::memory_order_relaxed) < 0.5f) continue;
+            if (e == nullptr || on == nullptr) continue;
+            const bool wantOn = on->load (std::memory_order_relaxed) >= 0.5f;
+            const bool was = wasRunning[(size_t) slot];
+            if (! wantOn && ! was) continue;
 
-            if (! wasRunning[(size_t) slot]) e->reset();      // fresh state when an effect is added or switched back on
+            if (wantOn && ! was) e->reset();                  // fresh state when an effect is added or switched back on
+            const bool fading = wantOn != was;                // switching on / off: cross-fade over this block instead of clicking
+            if (fading)
+                for (int ch = 0; ch < numCh; ++ch) preBuf.copyFrom (ch, 0, buf, ch, 0, n);
+
             e->process (buf, ctx);
-            running[(size_t) slot] = true;
+
+            if (fading)
+                for (int ch = 0; ch < numCh; ++ch)
+                {
+                    float* d = buf.getWritePointer (ch);
+                    const float* pre = preBuf.getReadPointer (ch);
+                    for (int i = 0; i < n; ++i)
+                    {
+                        const float w = (float) (i + 1) / (float) n;
+                        const float k = wantOn ? w : 1.0f - w;
+                        d[i] = pre[i] + (d[i] - pre[i]) * k;
+                    }
+                }
+            running[(size_t) slot] = wantOn;
         }
         wasRunning = running;
     }
@@ -472,6 +503,7 @@ juce::AudioProcessorEditor* ModularFXAudioProcessor::createEditor()
 
 void ModularFXAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
+    apvts.state.setProperty ("uiScale", (double) uiScale.load(), nullptr);
     auto state = apvts.copyState();
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
     if (xml != nullptr)
@@ -486,6 +518,7 @@ void ModularFXAudioProcessor::setStateInformation (const void* data, int sizeInB
     if (xmlState == nullptr || ! xmlState->hasTagName (apvts.state.getType())) return;
 
     apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
+    if (apvts.state.hasProperty ("uiScale")) uiScale.store (juce::jlimit (0.5f, 1.5f, (float) (double) apvts.state.getProperty ("uiScale")));
 
     std::vector<RackEntry> entries;
     const juce::String savedRack = apvts.state.getProperty ("rack").toString();

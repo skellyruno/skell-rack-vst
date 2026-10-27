@@ -98,12 +98,15 @@ inline const std::vector<FxCatalogEntry>& getFxCatalog()
         v.push_back (one   ("Compressor", 2, "Tight, energized sound with clarity.",        0xFFFF3B1D));
         v.push_back (plain (ID_MultiBand,  "Compressor", "Precise control over specific frequency ranges."));
         v.push_back (plain (ID_Compressor, "Compressor", "Evens out the level of loud and quiet parts."));
+        v.push_back (plain (ID_FbkComp,    "Compressor", "Smooth, forgiving feedback-style compression."));
+        v.push_back (plain (ID_GtrSqueeze, "Compressor", "Sustains guitar notes with a squeeze compressor."));
         v.push_back (plain (ID_Shaper,     "Compressor", "Reshapes the attack and sustain of a sound."));
 
         // Limiter
         v.push_back (plain (ID_Limiter,   "Limiter", "Transparent limiter for studio-grade sound."));
         v.push_back (plain (ID_FetComp,   "Limiter", "Classic limiting amplifier using FET compression."));
         v.push_back (plain (ID_OptoComp,  "Limiter", "Emulation of a famous optical compressor."));
+        v.push_back (plain (ID_VintageLimiter, "Limiter", "Characterful limiter with a soft knee and enhance."));
 
         // Rhythmic
         v.push_back (plain (ID_Pumper,   "Rhythmic", "Simulated side-chain compression."));
@@ -115,6 +118,10 @@ inline const std::vector<FxCatalogEntry>& getFxCatalog()
         v.push_back (one   ("EQ", 5, "Boosts lows, keeps tone full and warm.",   0xFFA600FF));
         v.push_back (one   ("EQ", 0, "Boosts highs, preserves natural tone.",    0xFFFFB703));
         v.push_back (plain (ID_VisualEQ, "EQ", "EQ with a real-time curve display."));
+        v.push_back (plain (ID_EzEq,      "EQ", "Simple EQ with a high-pass, a bell and a low-pass."));
+        v.push_back (plain (ID_Eq3M,      "EQ", "Three-band EQ with a sweepable mid."));
+        v.push_back (plain (ID_GraphicEq, "EQ", "Seven-band graphic EQ with sliders."));
+        v.push_back (plain (ID_MultiFilter, "EQ", "One filter with many shapes."));
 
         // Delay
         v.push_back (one   ("Delay", 1, "Clean delay for space and presence.", 0xFF2F9BFF));
@@ -146,6 +153,7 @@ inline const std::vector<FxCatalogEntry>& getFxCatalog()
         v.push_back (plain (ID_Reverb,    "Reverb", "Adds a room, hall or plate-style space."));
         v.push_back (plain (ID_VocalVerb, "Reverb", "Clean reverb for an uncolored ambiance."));
         v.push_back (plain (ID_Shimmer,   "Reverb", "Ethereal reverb with modulation and pitch shifting."));
+        v.push_back (plain (ID_SpringReverb, "Reverb", "The splashy, metallic sound of a spring tank."));
 
         // Utility
         v.push_back (plain (ID_FeedbackKiller, "Utility", "Detects any loud feedback and suppresses it."));
@@ -153,7 +161,7 @@ inline const std::vector<FxCatalogEntry>& getFxCatalog()
         v.push_back (plain (ID_Reverser,       "Utility", "Innovative sound shaping with adjustable reverse."));
 
         // Legacy
-        v.push_back (plain (ID_LegacyDelay, "Legacy", "More customisable delay with extra options."));
+        v.push_back (plain (ID_LegacyDelay, "Legacy", "Tempo-synced stereo delay with filters and spread."));
         return v;
     }();
     return e;

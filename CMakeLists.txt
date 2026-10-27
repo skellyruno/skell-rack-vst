@@ -42,6 +42,9 @@ target_sources(ModularFXSuite
         Source/Modules/NewEffects.h
         Source/Modules/MoreEffects.h
         Source/Modules/ExtraEffects.h
+        Source/Modules/BandLabFx.h
+        Source/Presets.h
+        Source/MasterPanels.h
         Source/FxCatalog.h
         Source/EffectBrowser.h
 )

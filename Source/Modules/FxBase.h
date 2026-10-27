@@ -373,10 +373,13 @@ class PitchShifter
 public:
     void prepare (double sr)
     {
+        maxWindow = (float) (0.12 * sr);
         window = (float) (0.06 * sr);
-        dl.prepare ((int) window + 8);
+        dl.prepare ((int) maxWindow + 8);
         phase = 0.0f;
     }
+    // grain length: short windows keep drums tight, long ones sound smoother on sustained notes
+    void setWindowSeconds (double seconds, double sr) noexcept { window = std::clamp ((float) (seconds * sr), 64.0f, maxWindow); }
     void reset() { dl.clear(); phase = 0.0f; }
 
     void push (int ch, float x) noexcept { dl.push (ch, x); }
@@ -396,7 +399,7 @@ public:
 
 private:
     DelayLine dl;
-    float window = 2048.0f, phase = 0.0f;
+    float window = 2048.0f, maxWindow = 4096.0f, phase = 0.0f;
 };
 
 } // namespace fx

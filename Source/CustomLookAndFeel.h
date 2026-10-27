@@ -174,10 +174,27 @@ public:
         const float angle = rotaryStartAngle + pos * (rotaryEndAngle - rotaryStartAngle);
         const float arcR = radius - 2.0f;
 
+        // "ticks" knobs (Input / Output / Frequency) show a ring of small dots and - / + marks instead of a value arc
+        const bool ticks = (bool) slider.getProperties()["ticks"];
         juce::Path track;
         track.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f, rotaryStartAngle, rotaryEndAngle, true);
-        g.setColour(juce::Colours::white.withAlpha(0.12f * alpha));
-        g.strokePath(track, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        if (! ticks)
+        {
+            g.setColour(juce::Colours::white.withAlpha(0.12f * alpha));
+            g.strokePath(track, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+        else
+        {
+            g.setColour(juce::Colours::white.withAlpha(0.45f * alpha));
+            for (int i = 0; i < 9; ++i)
+            {
+                const float a = rotaryStartAngle + (rotaryEndAngle - rotaryStartAngle) * (float) i / 8.0f;
+                g.fillEllipse(centre.x + std::sin(a) * (arcR - 0.5f) - 1.0f, centre.y - std::cos(a) * (arcR - 0.5f) - 1.0f, 2.0f, 2.0f);
+            }
+            g.setFont(juce::Font(juce::FontOptions(12.0f)));
+            g.drawText("-", juce::Rectangle<float>(centre.x - radius - 6.0f, centre.y + radius * 0.35f, 14.0f, 14.0f), juce::Justification::centred);
+            g.drawText("+", juce::Rectangle<float>(centre.x + radius - 8.0f, centre.y + radius * 0.35f, 14.0f, 14.0f), juce::Justification::centred);
+        }
 
         // fill from the left, or from the centre for bipolar controls
         // (slot parameters are plain 0..1 values, so bipolar controls say where their zero sits with a property)
@@ -186,7 +203,7 @@ public:
         const float zeroPos = bipolar ? static_cast<float>(slider.valueToProportionOfLength(static_cast<double>(zeroProp))) : 0.0f;
         const float zeroAngle = rotaryStartAngle + zeroPos * (rotaryEndAngle - rotaryStartAngle);
         const float from = juce::jmin(zeroAngle, angle), to = juce::jmax(zeroAngle, angle);
-        if (to - from > 0.01f)
+        if (! ticks && to - from > 0.01f)
         {
             juce::Path value;
             value.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f, from, to, true);
@@ -205,8 +222,37 @@ public:
         juce::Path pointer;
         pointer.startNewSubPath(centre.x + std::sin(angle) * bodyR * 0.35f, centre.y - std::cos(angle) * bodyR * 0.35f);
         pointer.lineTo(centre.x + std::sin(angle) * bodyR * 0.9f, centre.y - std::cos(angle) * bodyR * 0.9f);
-        g.setColour(juce::Colours::white.withAlpha(alpha));
+        g.setColour((body.getBrightness() > 0.7f ? juce::Colour(0xFF14161A) : juce::Colours::white).withAlpha(alpha));
         g.strokePath(pointer, juce::PathStrokeType(2.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    // Combo boxes look like BandLab's: a rounded dark field, a small accent caption on top, a chevron on the right.
+    void drawComboBox(juce::Graphics& g, int width, int height, bool /*isButtonDown*/, int, int, int, int, juce::ComboBox& box) override
+    {
+        auto r = juce::Rectangle<float>(0.0f, 0.0f, (float) width, (float) height);
+        g.setColour(juce::Colour(0xFF1E2126).withAlpha(box.isEnabled() ? 1.0f : 0.5f));
+        g.fillRoundedRectangle(r, 12.0f);
+
+        const juce::String caption = box.getProperties()["caption"].toString();
+        if (caption.isNotEmpty())
+        {
+            g.setColour(accent);
+            g.setFont(juce::Font(juce::FontOptions(11.0f)));
+            g.drawText(caption, juce::Rectangle<int>(14, 4, width - 40, 14), juce::Justification::centredLeft);
+        }
+
+        juce::Path chevron;
+        const float cx = (float) width - 20.0f, cy = (float) height * 0.5f;
+        chevron.startNewSubPath(cx - 5.0f, cy - 2.5f); chevron.lineTo(cx, cy + 2.5f); chevron.lineTo(cx + 5.0f, cy - 2.5f);
+        g.setColour(juce::Colours::white.withAlpha(0.85f));
+        g.strokePath(chevron, juce::PathStrokeType(1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override
+    {
+        const bool hasCaption = box.getProperties()["caption"].toString().isNotEmpty();
+        label.setBounds(10, hasCaption ? 15 : 1, box.getWidth() - 40, box.getHeight() - (hasCaption ? 19 : 2));
+        label.setFont(juce::Font(juce::FontOptions(hasCaption ? 16.0f : 14.0f)));
     }
 
 private:
