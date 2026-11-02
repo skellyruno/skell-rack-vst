@@ -65,6 +65,10 @@ public:
     bool exportPreset (int index, const juce::File& file) const;      // single preset file (.mfxpreset) to share
     int  importBandLabJson (const juce::String& jsonText, juce::StringArray& notes);   // BandLab preset JSON -> "My presets" and loads it; -1 on failure
     int  addUserPreset (PresetDef def);
+    // Any preset file: .mfxpreset / .xml (this plug-in) or .json (BandLab / the Skelly extractor). Returns the preset index or -1.
+    int  importAnyFile (const juce::File& file, juce::StringArray& notes);
+    static juce::File getExtractorFolder();                          // Desktop/BandLab_Presets, where the extractor saves
+    int  importLatestExtracted (juce::StringArray& notes);           // newest .json in that folder; -1 if none
     int  importPreset (const juce::File& file);                       // adds it to "My presets" and loads it; returns its index or -1                      // user presets only
     void clearRack();
     juce::String getPresetName() const;

@@ -231,9 +231,10 @@ private:
         m.addItem (1, "Preset file (.mfxpreset)...");
         m.addItem (2, "BandLab preset file (.json)...");
         m.addItem (3, "BandLab preset from clipboard (link or JSON)");
+        m.addItem (4, "Latest from extractor folder (Desktop/BandLab_Presets)");
         juce::Component::SafePointer<PresetBrowser> safe (this);
         m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (importButton),
-                         [safe] (int r) { if (safe == nullptr) return; if (r == 1) safe->askImportFile(); else if (r == 2) safe->askImportBandLabFile(); else if (r == 3) safe->importBandLabText (juce::SystemClipboard::getTextFromClipboard()); });
+                         [safe] (int r) { if (safe == nullptr) return; if (r == 1) safe->askImportFile(); else if (r == 2) safe->askImportBandLabFile(); else if (r == 3) safe->importBandLabText (juce::SystemClipboard::getTextFromClipboard()); else if (r == 4) safe->importLatest(); });
     }
 
     // Shows what happened; lists anything that could not be converted.
@@ -279,9 +280,43 @@ private:
         reportBandLab (proc.importBandLabJson (text, notes), notes);
     }
 
+    void importLatest()
+    {
+        if (! ModularFXAudioProcessor::getExtractorFolder().isDirectory())
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, "No extractor folder", "There is no BandLab_Presets folder on your Desktop yet. Export a preset with the Skelly extractor first, or pick the file with Import > BandLab preset file.");
+            return;
+        }
+        juce::StringArray notes;
+        const int idx = proc.importLatestExtracted (notes);
+        if (idx < 0 && notes.isEmpty())
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Nothing to import", "No usable preset .json was found in Desktop/BandLab_Presets.");
+            return;
+        }
+        reportBandLab (idx, notes);
+    }
+
+public:
+    // Used by the editor when a file is dropped onto the plug-in.
+    void importDropped (const juce::File& f)
+    {
+        juce::StringArray notes;
+        const int idx = proc.importAnyFile (f, notes);
+        if (idx < 0)
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Import failed", "That file is not a preset this plug-in understands.");
+            return;
+        }
+        if (notes.isEmpty()) { proc.rackChanged.sendChangeMessage(); return; }
+        reportBandLab (idx, notes);
+    }
+
+private:
     void askImportBandLabFile()
     {
-        chooser = std::make_unique<juce::FileChooser> ("Import BandLab preset", juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), "*.json;*.txt");
+        const auto start = ModularFXAudioProcessor::getExtractorFolder().isDirectory() ? ModularFXAudioProcessor::getExtractorFolder() : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+        chooser = std::make_unique<juce::FileChooser> ("Import BandLab preset", start, "*.json;*.txt");
         juce::Component::SafePointer<PresetBrowser> safe (this);
         chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [safe] (const juce::FileChooser& fc)

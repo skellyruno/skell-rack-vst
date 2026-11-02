@@ -75,5 +75,7 @@ New instances start with an empty rack (click Add Effect). Toggle buttons are da
 - Click the preset name to open the browser: search by name or tag, filter with the tag chips (Vocal, Guitar, Drums, Mix, Creative, Utility, Mine), click a row to load it. Import... and Export... read and write single `.mfxpreset` files for sharing. Saving a preset lets you pick a tag.
 
 ### Importing BandLab presets
+Fastest: drag a `.json` (BandLab or Skelly extractor export) or `.mfxpreset` onto the plug-in window. **Import... > Latest from extractor folder** loads the newest `.json` in `Desktop/BandLab_Presets`, and the BandLab file picker opens there too.
+
 In the preset browser choose **Import... > BandLab preset file (.json)** or **BandLab preset from clipboard**. The clipboard option takes either the preset JSON or a `bandlab.com/effect-presets/...` link. The link download is best-effort: BandLab has no documented public endpoint, so if it fails the plug-in tells you and you can paste the JSON instead. Supported BandLab effects: compressor, expGate, deEsser, threeBandEq, ddelay (D-Delay), bossGE7 (Graphic EQ), stereoSpreader, simpleStudioReverb (approximated by Reverb), pingpongDelay and delay (as Delay) and gain. Anything else is skipped and listed after the import. Times, percentages and dB values are converted to the plug-in's units.
 - A and B, and the latest 12 undo steps, are saved with the project, so you can reopen it and keep comparing.

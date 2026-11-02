@@ -63,6 +63,7 @@ public:
 };
 
 class ModularFXAudioProcessorEditor : public juce::AudioProcessorEditor,
+                                      public juce::FileDragAndDropTarget,
                                       private juce::ChangeListener,
                                       private juce::Timer
 {
@@ -73,6 +74,15 @@ public:
     void paint(juce::Graphics& g) override { g.fillAll(juce::Colour(0xFF0F1013)); }
     void resized() override;
     bool keyPressed(const juce::KeyPress& k) override;
+    bool isInterestedInFileDrag(const juce::StringArray& files) override
+    {
+        for (auto& f : files) { const auto e = juce::File(f).getFileExtension().toLowerCase(); if (e == ".json" || e == ".mfxpreset" || e == ".xml") return true; }
+        return false;
+    }
+    void filesDropped(const juce::StringArray& files, int, int) override
+    {
+        for (auto& f : files) { const auto e = juce::File(f).getFileExtension().toLowerCase(); if (e == ".json" || e == ".mfxpreset" || e == ".xml") { presetBrowser.importDropped(juce::File(f)); presetPanel.refresh(); break; } }
+    }
     MeterStrip& getMeterStrip() noexcept { return meters; }
     void refreshHistoryButtons();
 

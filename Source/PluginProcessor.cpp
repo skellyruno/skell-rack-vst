@@ -802,6 +802,28 @@ int ModularFXAudioProcessor::importBandLabJson (const juce::String& jsonText, ju
     return addUserPreset (std::move (r.def));
 }
 
+int ModularFXAudioProcessor::importAnyFile (const juce::File& file, juce::StringArray& notes)
+{
+    notes.clear();
+    const auto ext = file.getFileExtension().toLowerCase();
+    if (ext == ".json" || ext == ".txt") return importBandLabJson (file.loadFileAsString(), notes);
+    return importPreset (file);
+}
+
+juce::File ModularFXAudioProcessor::getExtractorFolder()
+{
+    return juce::File::getSpecialLocation (juce::File::userDesktopDirectory).getChildFile ("BandLab_Presets");
+}
+
+int ModularFXAudioProcessor::importLatestExtracted (juce::StringArray& notes)
+{
+    notes.clear();
+    juce::File newest;
+    for (const auto& f : getExtractorFolder().findChildFiles (juce::File::findFiles, false, "*.json"))
+        if (newest == juce::File() || f.getLastModificationTime() > newest.getLastModificationTime()) newest = f;
+    return newest == juce::File() ? -1 : importBandLabJson (newest.loadFileAsString(), notes);
+}
+
 int ModularFXAudioProcessor::addUserPreset (PresetDef def)
 {
     bool clash = false;                                                // never replace a factory preset
