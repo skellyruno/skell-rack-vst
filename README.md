@@ -1,6 +1,6 @@
 # Modular FX Suite (VST3)
 
-A rack of 47 effects in one plugin, modelled on BandLab's effects. Add, remove and reorder
+A rack of 49 effects in one plugin, modelled on BandLab's effects. Add, remove and reorder
 effects from the **+ Add Effect** button and the **< >  X** buttons on each card. The rack
 scrolls sideways (mouse wheel works). Stack up to 10 effects (the same effect can be added as many times as you like) and drag a card by its header to change the signal order. Order and on/off state are saved with your project.
 
@@ -62,3 +62,18 @@ New: Spring Reverb, Multi Filter, EZ EQ, Graphic EQ, EQ3-M, Vintage Limiter and 
 ## Tuning & presets
 - Compressor slopes were measured against the hardware ratios they emulate (BL 1176 4/8/12/20:1, BA-2A about 3:1 compress and 10:1 limit). Defaults of Noise Gate, DeEsser and BL 1176 follow BandLab's cards.
 - 8 new factory presets (16 in total) use the newer effects. Every factory preset is rendered in the test suite.
+
+## Defaults & look
+New instances start with an empty rack (click Add Effect). Toggle buttons are dark pills that light up when on, knobs have a consistent size, and the gain-reduction bars were removed to match BandLab's cards.
+
+## Meters, undo and A/B
+- The top bar shows input and output level meters with a live spectrum of the output between them.
+- Undo / Redo (buttons, Ctrl+Z, Ctrl+Y) cover adding, removing and reordering effects, every knob and the master controls; a whole knob drag is one step. History is kept while the editor is open.
+- A / B holds two complete sounds: the first click on B copies A, then tweak and flip between them to compare. A and B are not saved with the project.
+
+## Presets browser, and saved A/B
+- Click the preset name to open the browser: search by name or tag, filter with the tag chips (Vocal, Guitar, Drums, Mix, Creative, Utility, Mine), click a row to load it. Import... and Export... read and write single `.mfxpreset` files for sharing. Saving a preset lets you pick a tag.
+
+### Importing BandLab presets
+In the preset browser choose **Import... > BandLab preset file (.json)** or **BandLab preset from clipboard**. The clipboard option takes either the preset JSON or a `bandlab.com/effect-presets/...` link. The link download is best-effort: BandLab has no documented public endpoint, so if it fails the plug-in tells you and you can paste the JSON instead. Supported BandLab effects: compressor, expGate, deEsser, threeBandEq, ddelay (D-Delay), bossGE7 (Graphic EQ), stereoSpreader, simpleStudioReverb (approximated by Reverb), pingpongDelay and delay (as Delay) and gain. Anything else is skipped and listed after the import. Times, percentages and dB values are converted to the plug-in's units.
+- A and B, and the latest 12 undo steps, are saved with the project, so you can reopen it and keep comparing.

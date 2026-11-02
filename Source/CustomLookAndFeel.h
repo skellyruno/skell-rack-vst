@@ -226,6 +226,23 @@ public:
         g.strokePath(pointer, juce::PathStrokeType(2.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
 
+    // Toggle / momentary buttons: dark rounded pills that light up in the accent colour when on.
+    void drawButtonBackground(juce::Graphics& g, juce::Button& b, const juce::Colour&, bool over, bool down) override
+    {
+        auto r = b.getLocalBounds().toFloat().reduced(0.5f);
+        const bool on = b.getToggleState();
+        g.setColour(on ? accent.withAlpha(0.22f) : juce::Colour(0xFF1E2126));
+        g.fillRoundedRectangle(r, 13.0f);
+        g.setColour(on ? accent : juce::Colours::white.withAlpha(over || down ? 0.35f : 0.14f));
+        g.drawRoundedRectangle(r, 13.0f, on ? 1.4f : 1.0f);
+    }
+    void drawButtonText(juce::Graphics& g, juce::TextButton& b, bool, bool) override
+    {
+        g.setColour(b.getToggleState() ? accent.brighter(0.4f) : juce::Colours::white.withAlpha(0.85f));
+        g.setFont(juce::Font(juce::FontOptions(14.0f)));
+        g.drawText(b.getButtonText(), b.getLocalBounds(), juce::Justification::centred);
+    }
+
     // Combo boxes look like BandLab's: a rounded dark field, a small accent caption on top, a chevron on the right.
     void drawComboBox(juce::Graphics& g, int width, int height, bool /*isButtonDown*/, int, int, int, int, juce::ComboBox& box) override
     {

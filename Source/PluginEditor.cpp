@@ -5,11 +5,35 @@ namespace { constexpr int kTopBar = 46; constexpr int kPad = 10; constexpr int k
 namespace { constexpr int kNativeW = kLeftW + kCentreW + kRightW; constexpr int kNativeH = kTopBar + kCardH + 2 * kPad + 12; }
 
 ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProcessor& p)
-    : AudioProcessorEditor(&p), audioProcessor(p), presetPanel(p), outputPanel(p)
+    : AudioProcessorEditor(&p), audioProcessor(p), meters(p), presetPanel(p), outputPanel(p), presetBrowser(p)
 {
     content.onPaint = [this](juce::Graphics& g) { paintNative(g); };
     addAndMakeVisible(content);
 
+    content.addAndMakeVisible(meters);
+    auto arrow = [](bool undo) { return [undo](juce::Graphics& g, juce::Rectangle<float> r, bool over, bool, bool) {
+        auto c = r.reduced(4.0f);
+        g.setColour(juce::Colour(over ? 0xFF30333B : 0xFF23262C)); g.fillRoundedRectangle(r, 8.0f);
+        juce::Path p; const float cx = r.getCentreX(), cy = r.getCentreY(), s = undo ? -1.0f : 1.0f;
+        p.startNewSubPath(cx - 6.0f * s, cy + 3.0f); p.cubicTo(cx - 6.0f * s, cy - 6.0f, cx + 6.0f * s, cy - 6.0f, cx + 6.0f * s, cy + 3.0f);
+        p.startNewSubPath(cx + 6.0f * s, cy + 3.0f); p.lineTo(cx + 6.0f * s, cy - 2.0f); p.startNewSubPath(cx + 6.0f * s, cy + 3.0f); p.lineTo(cx + 1.5f * s, cy + 3.0f);
+        (void) c; g.setColour(juce::Colours::white); g.strokePath(p, juce::PathStrokeType(1.6f)); }; };
+    undoButton.painter = arrow(true);  redoButton.painter = arrow(false);
+    auto abPaint = [this](int slot) { return [this, slot](juce::Graphics& g, juce::Rectangle<float> r, bool over, bool, bool) {
+        const bool active = audioProcessor.getActiveAB() == slot;
+        g.setColour(active ? juce::Colour(0xFF22C7DB) : juce::Colour(over ? 0xFF30333B : 0xFF23262C)); g.fillRoundedRectangle(r, 8.0f);
+        g.setColour(active ? juce::Colour(0xFF0B1114) : juce::Colours::white.withAlpha(audioProcessor.abHasData(slot) || slot == 0 ? 0.95f : 0.55f));
+        g.setFont(juce::Font(juce::FontOptions(14.0f, juce::Font::bold)));
+        g.drawText(slot == 0 ? "A" : "B", r, juce::Justification::centred); }; };
+    abButtonA.painter = abPaint(0);  abButtonB.painter = abPaint(1);
+    undoButton.setTooltip("Undo (Ctrl+Z)");  redoButton.setTooltip("Redo (Ctrl+Y)");
+    abButtonA.setTooltip("Sound A");  abButtonB.setTooltip("Sound B: tweak, then flip between A and B to compare");
+    undoButton.onClick = [this] { audioProcessor.undo(); refreshHistoryButtons(); };
+    redoButton.onClick = [this] { audioProcessor.redo(); refreshHistoryButtons(); };
+    abButtonA.onClick  = [this] { audioProcessor.switchAB(0); refreshHistoryButtons(); };
+    abButtonB.onClick  = [this] { audioProcessor.switchAB(1); refreshHistoryButtons(); };
+    for (auto* b : { &abButtonA, &abButtonB, &undoButton, &redoButton }) content.addAndMakeVisible(*b);
+    setWantsKeyboardFocus(true);
     content.addAndMakeVisible(presetPanel);
     content.addAndMakeVisible(outputPanel);
     viewport.setViewedComponent(&rack, false);
@@ -23,9 +47,14 @@ ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProce
     browser.onPick  = [this](const FxCatalogEntry& entry) { addModule(entry); };
     browser.onClose = [this] { closeBrowser(); };
     content.addChildComponent(browser);
+    presetPanel.onBrowse = [this] { presetBrowser.setBounds(0, 0, kNativeW, kNativeH); presetBrowser.open(); };
+    presetBrowser.onClose = [this] { presetPanel.refresh(); repaint(); };
+    content.addChildComponent(presetBrowser);
 
     layoutNative();
     audioProcessor.rackChanged.addChangeListener(this);
+    audioProcessor.updateHistory();
+    startTimer(100);
 
     // resizable, always keeping the shape of the design; starts 25% smaller than the full-size layout
     const float scale = juce::jlimit(0.5f, 1.5f, audioProcessor.uiScale.load());
@@ -38,6 +67,7 @@ ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProce
 
 ModularFXAudioProcessorEditor::~ModularFXAudioProcessorEditor()
 {
+    stopTimer();
     audioProcessor.rackChanged.removeChangeListener(this);
 }
 
@@ -59,10 +89,32 @@ void ModularFXAudioProcessorEditor::paintNative(juce::Graphics& g)
 void ModularFXAudioProcessorEditor::layoutNative()
 {
     content.setBounds(0, 0, kNativeW, kNativeH);
+    meters.setBounds(400, 6, 400, 34);
+    abButtonA.setBounds(826, 9, 30, 28);   abButtonB.setBounds(860, 9, 30, 28);
+    undoButton.setBounds(906, 9, 34, 28);  redoButton.setBounds(944, 9, 34, 28);
     presetPanel.setBounds(0, kTopBar, kLeftW, kNativeH - kTopBar);
     outputPanel.setBounds(kNativeW - kRightW, kTopBar, kRightW, kNativeH - kTopBar);
     viewport.setBounds(kLeftW, kTopBar, kNativeW - kLeftW - kRightW, kNativeH - kTopBar);
     browser.setBounds(0, 0, kNativeW, kNativeH);
+}
+
+void ModularFXAudioProcessorEditor::refreshHistoryButtons()
+{
+    undoButton.setEnabled(audioProcessor.canUndo());  undoButton.setAlpha(audioProcessor.canUndo() ? 1.0f : 0.4f);
+    redoButton.setEnabled(audioProcessor.canRedo());  redoButton.setAlpha(audioProcessor.canRedo() ? 1.0f : 0.4f);
+    abButtonA.repaint();  abButtonB.repaint();
+}
+
+bool ModularFXAudioProcessorEditor::keyPressed(const juce::KeyPress& k)
+{
+    const bool cmd = k.getModifiers().isCommandDown() || k.getModifiers().isCtrlDown();
+    if (cmd && (k.getKeyCode() == 'Z' || k.getKeyCode() == 'z'))
+    {
+        if (k.getModifiers().isShiftDown()) audioProcessor.redo(); else audioProcessor.undo();
+        refreshHistoryButtons();  return true;
+    }
+    if (cmd && (k.getKeyCode() == 'Y' || k.getKeyCode() == 'y')) { audioProcessor.redo(); refreshHistoryButtons(); return true; }
+    return false;
 }
 
 void ModularFXAudioProcessorEditor::resized()

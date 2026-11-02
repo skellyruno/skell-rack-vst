@@ -546,7 +546,7 @@ public:
             const int row = i / cols, col = i % cols;
             const int inRow = juce::jmin(cols, nk - row * cols);
             const int xOffset = (cols - inRow) * cellW / 2;          // centre a short last row
-            placeKnob(knobs[(size_t) i], { area.getX() + xOffset + col * cellW, top + row * cellH, cellW, cellH });
+            placeKnob(knobs[(size_t) i], { area.getX() + xOffset + col * cellW, top + row * cellH, cellW, cellH }, 76);
         }
     }
 

@@ -57,16 +57,45 @@ public:
     juce::AudioProcessorValueTreeState& getApvts() noexcept { return apvts; }
 
     // ---- presets (message thread)
-    struct PresetInfo { juce::String name; bool factory = true; };
+    struct PresetInfo { juce::String name; bool factory = true; juce::String tags; };
     std::vector<PresetInfo> getPresetList() const;      // built-in presets first, then the user's saved ones
     bool loadPreset (int index);
-    bool savePreset (const juce::String& name);         // saves the current rack; replaces a user preset of the same name
-    bool deletePreset (int index);                      // user presets only
+    bool savePreset (const juce::String& name, const juce::String& tags = {});         // saves the current rack; replaces a user preset of the same name
+    bool deletePreset (int index);
+    bool exportPreset (int index, const juce::File& file) const;      // single preset file (.mfxpreset) to share
+    int  importBandLabJson (const juce::String& jsonText, juce::StringArray& notes);   // BandLab preset JSON -> "My presets" and loads it; -1 on failure
+    int  addUserPreset (PresetDef def);
+    int  importPreset (const juce::File& file);                       // adds it to "My presets" and loads it; returns its index or -1                      // user presets only
     void clearRack();
     juce::String getPresetName() const;
 
     // Sent (asynchronously, on the message thread) when a saved project restores a different rack.
     juce::ChangeBroadcaster rackChanged;
+
+    // ---- whole-rack snapshots: undo / redo and the A / B compare slots (message thread)
+    struct RackSnapshot
+    {
+        PresetDef rack;
+        float blend = 1.0f, vol = 0.0f, pan = 0.0f, rev = 0.0f;
+        bool valid = false;
+        bool sameAs (const RackSnapshot& o) const;
+    };
+    RackSnapshot captureSnapshot() const;
+    void applySnapshot (const RackSnapshot& s);
+    void updateHistory (bool forceCommit = false);     // call regularly (the editor does, every 100 ms)
+    bool canUndo() const noexcept { return ! undoStack.empty(); }
+    bool canRedo() const noexcept { return ! redoStack.empty(); }
+    void undo();
+    void redo();
+    int  getActiveAB() const noexcept { return activeAB; }
+    bool abHasData (int slot) const noexcept { return abSlots[(size_t) slot].valid; }
+    void switchAB (int slot);
+
+    // ---- meters (written by the audio thread, read and reset by the editor)
+    std::atomic<float> inPeakL { 0.0f }, inPeakR { 0.0f }, outPeakL { 0.0f }, outPeakR { 0.0f };
+    static constexpr int kScope = 4096;                // last samples of the output, for the spectrum display
+    std::array<float, kScope> scopeBuf {};
+    std::atomic<int> scopeWrite { 0 };
 
     std::atomic<float> uiScale { 0.75f };      // editor size relative to the full-size layout (remembered with the project)
 
@@ -102,7 +131,12 @@ private:
     ReverbCoreHolder reverbHolder;
     fx::Smooth blendSm, volSm, panLSm, panRSm, revSm;
     void processChunk (juce::AudioBuffer<float>& buf, const fx::Context& ctx);
-    bool applyPreset (const PresetDef& def);
+    bool applyPreset (const PresetDef& def, bool setName = true);
+    std::vector<RackSnapshot> undoStack, redoStack;
+    RackSnapshot committed, lastSeen;
+    int stableTicks = 0;
+    std::array<RackSnapshot, 2> abSlots;
+    int activeAB = 0;
     PresetDef readPreset (int index, bool& ok) const;
 
     double currentSampleRate = 44100.0;

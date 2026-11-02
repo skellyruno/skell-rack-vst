@@ -440,4 +440,119 @@ private:
     Smooth delaySm;
 };
 
+// ======================================================================= D-Delay (classic, time in ms)
+class DDelayFx : public Processor
+{
+public:
+    explicit DDelayFx (Bank& s)
+        : time (s, "DD_TIME"), dry (s, "DD_DRY"), wet (s, "DD_WET"), level (s, "DD_LEVEL"), regen (s, "DD_REGEN"), lpf (s, "DD_LPF"), hpf (s, "DD_HPF") {}
+
+    void prepare (double sampleRate, int) override
+    {
+        sr = sampleRate > 1000.0 ? sampleRate : 44100.0;
+        dl.prepare ((int) (sr * 2.1));
+        initSmooth (delaySm, sr, 0.08, 0.3f * (float) sr);
+        reset();
+    }
+    void reset() override { dl.clear(); for (auto& v : lpS) v = 0.0f; for (auto& v : hpS) v = 0.0f; }
+
+    void process (juce::AudioBuffer<float>& buffer, const Context&) override
+    {
+        const int numCh = std::min (buffer.getNumChannels(), kMaxCh);
+        const int n = buffer.getNumSamples();
+        if (numCh == 0) return;
+
+        delaySm.setTargetValue (std::clamp (time(), 1.0f, 2000.0f) * 0.001f * (float) sr);
+        const float fb = std::clamp (regen(), 0.0f, 0.95f);
+        const float dryG = std::clamp (dry(), 0.0f, 1.0f), wetG = std::clamp (wet(), 0.0f, 1.0f), outG = dbToGain (level());
+        const float lpC = onePoleCoef (sr, std::clamp (lpf(), 500.0f, 20000.0f)), hpC = onePoleCoef (sr, std::clamp (hpf(), 20.0f, 2000.0f));
+
+        for (int i = 0; i < n; ++i)
+        {
+            const float d = delaySm.getNextValue();
+            for (int ch = 0; ch < std::min (numCh, 2); ++ch)
+            {
+                const float in = sanitise (buffer.getReadPointer (ch)[i]);
+                const float tap = dl.read (ch, d);
+                lpS[ch] += lpC * (tap - lpS[ch]);
+                hpS[ch] += hpC * (lpS[ch] - hpS[ch]);
+                const float echo = lpS[ch] - hpS[ch];                    // band-limited echo
+                dl.push (ch, sanitise (in + fb * echo));
+                buffer.getWritePointer (ch)[i] = (in * dryG + echo * wetG) * outG;
+            }
+            dl.advance();
+        }
+    }
+
+private:
+    Param time, dry, wet, level, regen, lpf, hpf;
+    double sr = 44100.0;
+    DelayLine dl;
+    float lpS[2] {}, hpS[2] {};
+    Smooth delaySm;
+};
+
+// ======================================================================= Stereo Spreader
+// Widens the side signal separately below and above a crossover; decorrelated copies of the mid signal give
+// mono material some width too.
+class StereoSpreaderFx : public Processor
+{
+public:
+    explicit StereoSpreaderFx (Bank& s) : lowI (s, "SSP_LOW"), upI (s, "SSP_UPPER"), freq (s, "SSP_FREQ") {}
+
+    void prepare (double sampleRate, int) override
+    {
+        sr = sampleRate > 1000.0 ? sampleRate : 44100.0;
+        static const int lens[4] = { 7, 11, 17, 23 };
+        for (int b = 0; b < 2; ++b)
+            for (int k = 0; k < 4; ++k) { ap[b][k].prepare ((int) std::max (2.0, lens[k] * sr / 44100.0 * (b == 0 ? 1.7 : 1.0))); ap[b][k].g = 0.55f; }
+        reset();
+    }
+    void reset() override { for (auto& b : ap) for (auto& a : b) a.reset(); midLo.reset(); midHi.reset(); sideLo.reset(); sideHi.reset(); lpMid.reset(); lpSide.reset(); }
+
+    void process (juce::AudioBuffer<float>& buffer, const Context&) override
+    {
+        if (buffer.getNumChannels() < 2) return;
+        const int n = buffer.getNumSamples();
+        const float fc = clampFreq (freq(), sr);
+        lpMid.lowpass (sr, fc);  hiMid.highpass (sr, fc);
+        lpSide.lowpass (sr, fc); hiSide.highpass (sr, fc);
+        const float gl = std::clamp (lowI(), 0.0f, 1.0f), gu = std::clamp (upI(), 0.0f, 1.0f);
+
+        float* L = buffer.getWritePointer (0);
+        float* R = buffer.getWritePointer (1);
+        for (int i = 0; i < n; ++i)
+        {
+            const float l = sanitise (L[i]), r = sanitise (R[i]);
+            const float m = 0.5f * (l + r), s = 0.5f * (l - r);
+            const float mLo = lpMid.process (0, m), mHi = hiMid.process (0, m);
+            const float sLo = lpSide.process (0, s), sHi = hiSide.process (0, s);
+
+            float dLo = mLo, dHi = mHi;                              // decorrelated copies of the mid
+            for (auto& a : ap[0]) dLo = a.process (dLo);
+            for (auto& a : ap[1]) dHi = a.process (dHi);
+
+            const float side = sLo * (1.0f + 1.5f * gl) + sHi * (1.0f + 1.5f * gu) + dLo * gl * 0.6f + dHi * gu * 0.6f;
+            L[i] = m + side;
+            R[i] = m - side;
+        }
+    }
+
+private:
+    Param lowI, upI, freq;
+    double sr = 44100.0;
+    Allpass ap[2][4];
+    struct Lp { void reset() {} };
+    Lp midLo, midHi, sideLo, sideHi;
+    struct Crossover
+    {
+        Biquad a, b;
+        void reset() { a.reset(); b.reset(); }
+        void lowpass (double sr, float f)  { a.set (BiquadCoeffs::lowpass (sr, f, 0.70710678));  b.set (BiquadCoeffs::lowpass (sr, f, 0.70710678)); }
+        void highpass (double sr, float f) { a.set (BiquadCoeffs::highpass (sr, f, 0.70710678)); b.set (BiquadCoeffs::highpass (sr, f, 0.70710678)); }
+        float process (int ch, float x) noexcept { return b.process (ch, a.process (ch, x)); }
+    };
+    Crossover lpMid, hiMid, lpSide, hiSide;
+};
+
 } // namespace fx

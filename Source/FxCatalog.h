@@ -156,11 +156,13 @@ inline const std::vector<FxCatalogEntry>& getFxCatalog()
         v.push_back (plain (ID_SpringReverb, "Reverb", "The splashy, metallic sound of a spring tank."));
 
         // Utility
+        v.push_back (plain (ID_StereoSpreader, "Utility", "Widens the stereo image of any sound."));
         v.push_back (plain (ID_FeedbackKiller, "Utility", "Detects any loud feedback and suppresses it."));
         v.push_back (plain (ID_Gain,           "Utility", "Controls the gain of the audio signal."));
         v.push_back (plain (ID_Reverser,       "Utility", "Innovative sound shaping with adjustable reverse."));
 
         // Legacy
+        v.push_back (plain (ID_DDelay, "Legacy", "Classic delay with time in milliseconds, filters and regen."));
         v.push_back (plain (ID_LegacyDelay, "Legacy", "Tempo-synced stereo delay with filters and spread."));
         return v;
     }();

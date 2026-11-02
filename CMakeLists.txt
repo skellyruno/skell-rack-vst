@@ -47,6 +47,8 @@ target_sources(ModularFXSuite
         Source/MasterPanels.h
         Source/FxCatalog.h
         Source/EffectBrowser.h
+        Source/Meters.h
+        Source/PresetBrowser.h
 )
 
 target_compile_definitions(ModularFXSuite

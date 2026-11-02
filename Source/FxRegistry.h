@@ -56,6 +56,8 @@ enum ModuleID : int
     ID_VintageLimiter,
     ID_Eq3M,
     ID_GtrSqueeze,
+    ID_DDelay,
+    ID_StereoSpreader,
     ID_NumModules
 };
 
@@ -194,7 +196,7 @@ inline const std::vector<FxInfo>& getFxRegistry()
 
         add (ID_MultiBand, "Multi-Band Comp", "MB",
              "Splits the sound into low, mid and high bands and compresses each on its own, so you can tighten the lows without squashing the highs.",
-             0xFF1E1B2E, 0xFFB388FF, DisplayKind::GainReduction, false,
+             0xFF1E1B2E, 0xFFB388FF, DisplayKind::None, false,
              { K ("MB_XLOW", "Low X-over", 60.0f, 400.0f, 150.0f, "Hz", 0, 150.0f),
                K ("MB_XHIGH", "High X-over", 1000.0f, 8000.0f, 2500.0f, "Hz", 0, 2500.0f),
                K ("MB_LTHR", "Low Thresh", -60.0f, 0.0f, -20.0f, "dB", 1),
@@ -205,7 +207,7 @@ inline const std::vector<FxInfo>& getFxRegistry()
 
         add (ID_Limiter, "Clean Limiter", "LIM",
              "A transparent peak limiter. Push Gain to make things louder, the Ceiling is the level nothing will ever go above.",
-             0xFF10261F, 0xFF3DDC97, DisplayKind::GainReduction, false,
+             0xFF10261F, 0xFF3DDC97, DisplayKind::None, false,
              { K ("LIM_GAIN", "Gain", 0.0f, 24.0f, 0.0f, "dB", 1),
                K ("LIM_CEIL", "Ceiling", -12.0f, 0.0f, -0.3f, "dB", 1),
                K ("LIM_REL", "Release", 10.0f, 1000.0f, 100.0f, "ms", 0, 100.0f) });
@@ -368,7 +370,7 @@ inline const std::vector<FxInfo>& getFxRegistry()
              "Turns down harsh 's' and 'sh' sounds in a voice. Drag the Threshold pill to set how loud they must be before they are reduced, and Frequency to where the sibilance lives.",
              0xFF0F0F0F, 0xFFFFB703, DisplayKind::None, false,
              { K ("DS_THRESH", "Threshold", -60.0f, 0.0f, -19.0f, "dB", 1),
-               K ("DS_FREQ", "Frequency", 3000.0f, 12000.0f, 9000.0f, "Hz", 0, 9000.0f) });
+               K ("DS_FREQ", "Frequency", 3000.0f, 16000.0f, 9000.0f, "Hz", 0, 7000.0f) });
 
 
         // ------------------------------------------------------------ utility, dynamics, modulation, delay, saturation
@@ -541,10 +543,28 @@ inline const std::vector<FxInfo>& getFxRegistry()
         add (ID_Eq3M, "EQ3-M", "EQ3",
              "A classic three-band tone control with a sweepable mid. Mid Sweep chooses which mid frequencies the Mid knob boosts or cuts.",
              0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
-             { K ("EQ3_LOW", "Low", -12.0f, 12.0f, 0.0f, "dB", 1),
-               K ("EQ3_MID", "Mid", -12.0f, 12.0f, 0.0f, "dB", 1),
-               K ("EQ3_HIGH", "High", -12.0f, 12.0f, 0.0f, "dB", 1),
+             { K ("EQ3_LOW", "Low", -20.0f, 20.0f, 0.0f, "dB", 1),
+               K ("EQ3_MID", "Mid", -20.0f, 20.0f, 0.0f, "dB", 1),
+               K ("EQ3_HIGH", "High", -20.0f, 20.0f, 0.0f, "dB", 1),
                Pct ("EQ3_SWEEP", "Mid Sweep", 0.5f) });
+
+        add (ID_DDelay, "D-Delay", "DD",
+             "A classic delay. Time is in milliseconds, Regen sends the echoes back round, and the low-pass and high-pass filters shape every echo. Dry and Wet set the balance.",
+             0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
+             { K ("DD_TIME", "Time", 1.0f, 2000.0f, 300.0f, "ms", 0, 300.0f),
+               Pct ("DD_DRY", "Dry", 1.0f),
+               Pct ("DD_WET", "Wet", 0.3f),
+               K ("DD_LEVEL", "Level", -24.0f, 12.0f, 0.0f, "dB", 1),
+               Pct ("DD_REGEN", "Regen", 0.3f),
+               K ("DD_LPF", "Low Pass", 500.0f, 20000.0f, 20000.0f, "Hz", 0, 5000.0f),
+               K ("DD_HPF", "High Pass", 20.0f, 2000.0f, 20.0f, "Hz", 0, 200.0f) });
+
+        add (ID_StereoSpreader, "Stereo Spreader", "SSP",
+             "Widens the stereo image, even for mono sounds. Lower Intensity widens the bass region, Upper Intensity everything above the Upper Frequency.",
+             0xFF121316, 0xFF22C7DB, DisplayKind::None, false,
+             { Pct ("SSP_LOW", "Lower Intensity", 0.5f),
+               Pct ("SSP_UPPER", "Upper Intensity", 0.5f),
+               K ("SSP_FREQ", "Upper Frequency", 100.0f, 8000.0f, 632.0f, "Hz", 0, 800.0f) });
 
         add (ID_GtrSqueeze, "GTR Squeeze", "GSQ",
              "Makes guitar notes sustain by squeezing the level. Turn Sustain up for longer, even notes and Volume to set how loud it comes out.",

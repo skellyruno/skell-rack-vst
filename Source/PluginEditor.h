@@ -4,6 +4,8 @@
 #include "ModuleCards.h"
 #include "EffectBrowser.h"
 #include "MasterPanels.h"
+#include "Meters.h"
+#include "PresetBrowser.h"
 
 // Mouse wheel scrolls the rack sideways.
 class RackViewport : public juce::Viewport
@@ -61,7 +63,8 @@ public:
 };
 
 class ModularFXAudioProcessorEditor : public juce::AudioProcessorEditor,
-                                      private juce::ChangeListener
+                                      private juce::ChangeListener,
+                                      private juce::Timer
 {
 public:
     explicit ModularFXAudioProcessorEditor(ModularFXAudioProcessor& p);
@@ -69,8 +72,12 @@ public:
 
     void paint(juce::Graphics& g) override { g.fillAll(juce::Colour(0xFF0F1013)); }
     void resized() override;
+    bool keyPressed(const juce::KeyPress& k) override;
+    MeterStrip& getMeterStrip() noexcept { return meters; }
+    void refreshHistoryButtons();
 
 private:
+    void timerCallback() override { audioProcessor.updateHistory(); refreshHistoryButtons(); }
     void changeListenerCallback(juce::ChangeBroadcaster*) override { layoutRack(); }
     void paintNative(juce::Graphics& g);
     void layoutNative();
@@ -89,11 +96,14 @@ private:
     UiCanvas content;                // everything lives in here at native size
 
     // Declaration order matters: cards are destroyed first, then the viewport, then the rack they live in.
+    MeterStrip meters;
+    masterui::PaintedButton undoButton, redoButton, abButtonA, abButtonB;
     PresetPanel presetPanel;
     OutputPanel outputPanel;
     RackPanel rack;
     AddEffectTile addTile;
     RackViewport viewport;
     std::array<std::unique_ptr<ModuleCardBase>, kMaxRack> cards;     // one per slot
+    PresetBrowser presetBrowser;
     EffectBrowser browser;                                           // overlay, hidden until Add Effect is clicked
 };

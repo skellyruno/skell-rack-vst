@@ -97,6 +97,7 @@ public:
         blend.onValueChange();
     }
 
+    std::function<void()> onBrowse;           // opens the preset browser (falls back to a simple menu)
     void refresh() { repaint(); }
 
     void paint (juce::Graphics& g) override
@@ -168,7 +169,10 @@ public:
     void mouseUp (const juce::MouseEvent& e) override
     {
         const auto nb = nameBounds().reduced (30, 0);
-        if (nb.contains (e.getPosition()) && ! e.mouseWasDraggedSinceMouseDown()) showPresetMenu();
+        if (nb.contains (e.getPosition()) && ! e.mouseWasDraggedSinceMouseDown())
+        {
+            if (onBrowse) onBrowse(); else showPresetMenu();
+        }
     }
 
 private:
@@ -238,12 +242,15 @@ private:
     {
         auto* w = new juce::AlertWindow ("Save preset", "Name your preset:", juce::MessageBoxIconType::NoIcon);
         w->addTextEditor ("name", proc.getPresetName());
+        w->addComboBox ("tag", juce::StringArray { "No tag", "Vocal", "Guitar", "Drums", "Mix", "Creative", "Utility" }, "Tag");
         w->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
         w->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
         juce::Component::SafePointer<PresetPanel> safe (this);
         w->enterModalState (true, juce::ModalCallbackFunction::create ([safe, w] (int r)
         {
-            if (r == 1 && safe != nullptr) { safe->proc.savePreset (w->getTextEditorContents ("name")); safe->repaint(); }
+            if (r == 1 && safe != nullptr) { auto* tagBox = w->getComboBoxComponent ("tag");
+                const juce::String tag = tagBox != nullptr && tagBox->getSelectedItemIndex() > 0 ? tagBox->getText() : juce::String();
+                safe->proc.savePreset (w->getTextEditorContents ("name"), tag); safe->repaint(); }
         }), true);
     }
 

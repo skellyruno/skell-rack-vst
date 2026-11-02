@@ -18,6 +18,7 @@ struct PresetDef
 {
     juce::String name;
     std::vector<PresetFx> fx;
+    juce::String tags;                 // comma separated: Vocal, Guitar, Drums, Mix, Creative, Utility
 };
 
 // Start from the effect's defaults and override the named controls with real values (Hz, dB, %, choice index ...).
@@ -126,6 +127,14 @@ inline const std::vector<PresetDef>& getFactoryPresets()
             makePresetFx (ID_EzEq,        { { "EZ_HP", 80.0f } }),
             makePresetFx (ID_Compressor,  { { "COMP_THRESH", -20.0f }, { "COMP_RATIO", 3.0f } }),
             makePresetFx (ID_DeEsser,     {}) } });
+
+        const std::pair<const char*, const char*> tagTable[] = {
+            { "Vocal Polish", "Vocal" }, { "Radio Voice", "Vocal,Creative" }, { "Crunch Guitar", "Guitar" }, { "Wide Chorus Pad", "Creative" },
+            { "Lo-Fi Tape", "Creative" }, { "Octave Glow", "Guitar,Creative" }, { "Drum Punch", "Drums" }, { "Clean Master", "Mix" },
+            { "Spring Surf Guitar", "Guitar" }, { "Vintage Vocal", "Vocal" }, { "Telephone", "Vocal,Creative" }, { "Filter Sweep Echo", "Creative" },
+            { "Dub Delay", "Creative" }, { "Bright Mix Bus", "Mix" }, { "Harmony Stack", "Vocal,Creative" }, { "Clean Up Podcast", "Vocal,Utility" } };
+        for (auto& d : p)
+            for (const auto& t : tagTable) if (d.name == t.first) d.tags = t.second;
         return p;
     }();
     return presets;
@@ -142,6 +151,7 @@ inline std::unique_ptr<juce::XmlElement> presetToXml (const PresetDef& def)
 {
     auto xml = std::make_unique<juce::XmlElement> ("ModularFXPreset");
     xml->setAttribute ("name", def.name);
+    if (def.tags.isNotEmpty()) xml->setAttribute ("tags", def.tags);
     for (const auto& f : def.fx)
     {
         auto* e = xml->createNewChildElement ("FX");
@@ -156,6 +166,7 @@ inline bool presetFromXml (const juce::XmlElement& xml, PresetDef& out)
 {
     if (! xml.hasTagName ("ModularFXPreset")) return false;
     out.name = xml.getStringAttribute ("name");
+    out.tags = xml.getStringAttribute ("tags");
     out.fx.clear();
     for (auto* e : xml.getChildWithTagNameIterator ("FX"))
     {

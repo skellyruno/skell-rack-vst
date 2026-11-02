@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "BandLabImport.h"
 #include "Modules/DSPModules.h"
 #include "Modules/NewEffects.h"
 #include "Modules/MoreEffects.h"
@@ -55,6 +56,8 @@ namespace
             case ID_DelayPlus: return std::make_unique<fx::DelayPlusFx> (s);
             case ID_FilterEcho: return std::make_unique<fx::FilterEchoFx> (s);
             case ID_LegacyDelay: return std::make_unique<fx::DDelayPlusFx> (s);
+            case ID_DDelay: return std::make_unique<fx::DDelayFx> (s);
+            case ID_StereoSpreader: return std::make_unique<fx::StereoSpreaderFx> (s);
             case ID_SpringReverb: return std::make_unique<fx::SpringReverbFx> (s);
             case ID_MultiFilter: return std::make_unique<fx::MultiFilterFx> (s);
             case ID_EzEq: return std::make_unique<fx::EzEqFx> (s);
@@ -137,8 +140,8 @@ ModularFXAudioProcessor::ModularFXAudioProcessor()
     dryBuf.setSize (2, 512);
     preBuf.setSize (2, 512);
 
-    // Default rack: the original three effects.
-    commitRack ({ { 0, ID_Reverser }, { 1, ID_NoiseGate }, { 2, ID_Chorus } }, true);
+    // New instances start with an empty rack.
+    commitRack ({}, true);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout ModularFXAudioProcessor::createParameterLayout()
@@ -375,6 +378,15 @@ void ModularFXAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     for (int i = totalIn; i < totalOut; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
+    // input meters
+    if (buffer.getNumChannels() > 0)
+    {
+        const float pl = buffer.getMagnitude (0, 0, buffer.getNumSamples());
+        const float pr = buffer.getNumChannels() > 1 ? buffer.getMagnitude (1, 0, buffer.getNumSamples()) : pl;
+        if (pl > inPeakL.load (std::memory_order_relaxed)) inPeakL.store (pl, std::memory_order_relaxed);
+        if (pr > inPeakR.load (std::memory_order_relaxed)) inPeakR.store (pr, std::memory_order_relaxed);
+    }
+
     // host tempo / transport
     fx::Context ctx;
     ctx.sampleRate = currentSampleRate;
@@ -410,6 +422,21 @@ void ModularFXAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
         float* d = buffer.getWritePointer (ch);
         for (int i = 0; i < total; ++i)
             d[i] = std::isfinite (d[i]) ? juce::jlimit (-8.0f, 8.0f, d[i]) : 0.0f;
+    }
+
+    // output meters and the spectrum feed
+    if (buffer.getNumChannels() > 0)
+    {
+        const float pl = buffer.getMagnitude (0, 0, total);
+        const float pr = buffer.getNumChannels() > 1 ? buffer.getMagnitude (1, 0, total) : pl;
+        if (pl > outPeakL.load (std::memory_order_relaxed)) outPeakL.store (pl, std::memory_order_relaxed);
+        if (pr > outPeakR.load (std::memory_order_relaxed)) outPeakR.store (pr, std::memory_order_relaxed);
+
+        int w = scopeWrite.load (std::memory_order_relaxed);
+        const float* l = buffer.getReadPointer (0);
+        const float* r = buffer.getNumChannels() > 1 ? buffer.getReadPointer (1) : l;
+        for (int i = 0; i < total; ++i) { scopeBuf[(size_t) (w & (kScope - 1))] = 0.5f * (l[i] + r[i]); ++w; }
+        scopeWrite.store (w & 0x3FFFFFFF, std::memory_order_release);
     }
 }
 
@@ -501,13 +528,53 @@ juce::AudioProcessorEditor* ModularFXAudioProcessor::createEditor()
     return new ModularFXAudioProcessorEditor (*this);
 }
 
+namespace
+{
+    std::unique_ptr<juce::XmlElement> snapshotToXml (const ModularFXAudioProcessor::RackSnapshot& s, const char* tag)
+    {
+        auto wrap = std::make_unique<juce::XmlElement> (tag);
+        PresetDef d = s.rack;
+        d.name = "snapshot";
+        auto x = presetToXml (d);
+        x->setAttribute ("blend", (double) s.blend);  x->setAttribute ("vol", (double) s.vol);
+        x->setAttribute ("pan", (double) s.pan);      x->setAttribute ("rev", (double) s.rev);
+        wrap->addChildElement (x.release());
+        return wrap;
+    }
+
+    bool snapshotFromXml (const juce::XmlElement& wrap, ModularFXAudioProcessor::RackSnapshot& out)
+    {
+        auto* x = wrap.getChildByName ("ModularFXPreset");
+        if (x == nullptr || ! presetFromXml (*x, out.rack)) return false;
+        out.blend = (float) x->getDoubleAttribute ("blend", 1.0);  out.vol = (float) x->getDoubleAttribute ("vol", 0.0);
+        out.pan = (float) x->getDoubleAttribute ("pan", 0.0);      out.rev = (float) x->getDoubleAttribute ("rev", 0.0);
+        out.valid = true;
+        return true;
+    }
+    constexpr int kSavedUndoSteps = 12;
+}
+
 void ModularFXAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     apvts.state.setProperty ("uiScale", (double) uiScale.load(), nullptr);
     auto state = apvts.copyState();
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
-    if (xml != nullptr)
-        copyXmlToBinary (*xml, destData);
+    if (xml == nullptr) return;
+
+    // A / B slots and the latest undo steps travel with the project
+    abSlots[(size_t) activeAB] = captureSnapshot();
+    auto* hist = xml->createNewChildElement ("MFXHistory");
+    hist->setAttribute ("active", activeAB);
+    for (int i = 0; i < 2; ++i)
+        if (abSlots[(size_t) i].valid)
+        {
+            auto e = snapshotToXml (abSlots[(size_t) i], "AB");
+            e->setAttribute ("slot", i);
+            hist->addChildElement (e.release());
+        }
+    const size_t first = undoStack.size() > (size_t) kSavedUndoSteps ? undoStack.size() - (size_t) kSavedUndoSteps : 0;
+    for (size_t i = first; i < undoStack.size(); ++i) hist->addChildElement (snapshotToXml (undoStack[i], "Undo").release());
+    copyXmlToBinary (*xml, destData);
 }
 
 void ModularFXAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
@@ -516,6 +583,23 @@ void ModularFXAudioProcessor::setStateInformation (const void* data, int sizeInB
 
     std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
     if (xmlState == nullptr || ! xmlState->hasTagName (apvts.state.getType())) return;
+
+    // pull the A/B + undo history out before the rest becomes the parameter state
+    std::array<RackSnapshot, 2> loadedAB;
+    std::vector<RackSnapshot> loadedUndo;
+    int loadedActive = 0;
+    if (auto* hist = xmlState->getChildByName ("MFXHistory"))
+    {
+        loadedActive = juce::jlimit (0, 1, hist->getIntAttribute ("active", 0));
+        for (auto* e : hist->getChildIterator())
+        {
+            RackSnapshot s;
+            if (! snapshotFromXml (*e, s)) continue;
+            if (e->hasTagName ("AB")) loadedAB[(size_t) juce::jlimit (0, 1, e->getIntAttribute ("slot", 0))] = s;
+            else if (e->hasTagName ("Undo")) loadedUndo.push_back (s);
+        }
+        xmlState->removeChildElement (hist, true);
+    }
 
     apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
     if (apvts.state.hasProperty ("uiScale")) uiScale.store (juce::jlimit (0.5f, 1.5f, (float) (double) apvts.state.getProperty ("uiScale")));
@@ -579,6 +663,13 @@ void ModularFXAudioProcessor::setStateInformation (const void* data, int sizeInB
 
     commitRack (entries, false);
     rackChanged.sendChangeMessage();
+
+    abSlots = loadedAB;
+    activeAB = abSlots[(size_t) loadedActive].valid ? loadedActive : 0;
+    undoStack = loadedUndo;
+    redoStack.clear();
+    committed = lastSeen = captureSnapshot();
+    stableTicks = 0;
 }
 
 // ------------------------------------------------------------------------------------ presets
@@ -597,15 +688,15 @@ juce::String ModularFXAudioProcessor::getPresetName() const
 std::vector<ModularFXAudioProcessor::PresetInfo> ModularFXAudioProcessor::getPresetList() const
 {
     std::vector<PresetInfo> list;
-    for (const auto& p : getFactoryPresets()) list.push_back ({ p.name, true });
+    for (const auto& p : getFactoryPresets()) list.push_back ({ p.name, true, p.tags });
 
     auto files = getUserPresetFolder().findChildFiles (juce::File::findFiles, false, "*.xml");
-    juce::StringArray names;
+    std::vector<PresetInfo> mine;
     for (const auto& f : files)
         if (auto xml = juce::XmlDocument::parse (f))
-            if (xml->hasTagName ("ModularFXPreset")) names.add (xml->getStringAttribute ("name"));
-    names.sort (true);
-    for (const auto& n : names) list.push_back ({ n, false });
+            if (xml->hasTagName ("ModularFXPreset")) mine.push_back ({ xml->getStringAttribute ("name"), false, xml->getStringAttribute ("tags") });
+    std::sort (mine.begin(), mine.end(), [] (const PresetInfo& a, const PresetInfo& b) { return a.name.compareIgnoreCase (b.name) < 0; });
+    for (auto& m : mine) list.push_back (m);
     return list;
 }
 
@@ -625,7 +716,7 @@ PresetDef ModularFXAudioProcessor::readPreset (int index, bool& ok) const
     return def;
 }
 
-bool ModularFXAudioProcessor::applyPreset (const PresetDef& def)
+bool ModularFXAudioProcessor::applyPreset (const PresetDef& def, bool setName)
 {
     std::vector<RackEntry> entries;
     for (int i = 0; i < (int) def.fx.size() && i < kSlots; ++i)
@@ -637,7 +728,7 @@ bool ModularFXAudioProcessor::applyPreset (const PresetDef& def)
         entries.push_back ({ i, f.type });
     }
     commitRack (entries, false);
-    apvts.state.setProperty ("preset", def.name, nullptr);
+    if (setName) apvts.state.setProperty ("preset", def.name, nullptr);
     rackChanged.sendChangeMessage();
     return true;
 }
@@ -649,13 +740,14 @@ bool ModularFXAudioProcessor::loadPreset (int index)
     return ok && applyPreset (def);
 }
 
-bool ModularFXAudioProcessor::savePreset (const juce::String& nameIn)
+bool ModularFXAudioProcessor::savePreset (const juce::String& nameIn, const juce::String& tags)
 {
     const juce::String name = nameIn.trim();
     if (name.isEmpty()) return false;
 
     PresetDef def;
     def.name = name;
+    def.tags = tags;
     for (const auto& e : getRack())
     {
         PresetFx f;
@@ -686,7 +778,143 @@ bool ModularFXAudioProcessor::deletePreset (int index)
     return removed;
 }
 
+bool ModularFXAudioProcessor::exportPreset (int index, const juce::File& file) const
+{
+    bool ok = false;
+    const auto def = readPreset (index, ok);
+    return ok && presetToXml (def)->writeTo (file);
+}
+
+int ModularFXAudioProcessor::importPreset (const juce::File& file)
+{
+    auto xml = juce::XmlDocument::parse (file);
+    PresetDef def;
+    if (xml == nullptr || ! presetFromXml (*xml, def) || def.fx.empty()) return -1;
+
+    return addUserPreset (std::move (def));
+}
+
+int ModularFXAudioProcessor::importBandLabJson (const juce::String& jsonText, juce::StringArray& notes)
+{
+    auto r = bandlab::fromJson (jsonText);
+    notes = r.notes;
+    if (! r.ok) return -1;
+    return addUserPreset (std::move (r.def));
+}
+
+int ModularFXAudioProcessor::addUserPreset (PresetDef def)
+{
+    bool clash = false;                                                // never replace a factory preset
+    for (const auto& p : getFactoryPresets()) clash = clash || p.name == def.name;
+    if (clash) def.name += " (imported)";
+
+    const auto folder = getUserPresetFolder();
+    if (! folder.createDirectory()) return -1;
+    if (! presetToXml (def)->writeTo (folder.getChildFile (juce::File::createLegalFileName (def.name) + ".xml"))) return -1;
+
+    const auto list = getPresetList();
+    for (int i = 0; i < (int) list.size(); ++i)
+        if (! list[(size_t) i].factory && list[(size_t) i].name == def.name) { loadPreset (i); return i; }
+    return -1;
+}
+
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new ModularFXAudioProcessor();
+}
+
+
+// ============================================================================ snapshots, undo / redo, A / B
+bool ModularFXAudioProcessor::RackSnapshot::sameAs (const RackSnapshot& o) const
+{
+    if (valid != o.valid || rack.fx.size() != o.rack.fx.size()) return false;
+    if (std::abs (blend - o.blend) > 1.0e-4f || std::abs (vol - o.vol) > 1.0e-3f || std::abs (pan - o.pan) > 1.0e-4f || std::abs (rev - o.rev) > 1.0e-4f) return false;
+    for (size_t i = 0; i < rack.fx.size(); ++i)
+    {
+        const auto& a = rack.fx[i]; const auto& b = o.rack.fx[i];
+        if (a.type != b.type || a.on != b.on) return false;
+        for (size_t j = 0; j < a.norm.size(); ++j) if (std::abs (a.norm[j] - b.norm[j]) > 1.0e-5f) return false;
+    }
+    return true;
+}
+
+ModularFXAudioProcessor::RackSnapshot ModularFXAudioProcessor::captureSnapshot() const
+{
+    RackSnapshot s;
+    for (const auto& e : getRack())
+    {
+        PresetFx f;
+        f.type = e.type;
+        f.on = onRaw[(size_t) e.slot]->load() >= 0.5f;
+        for (int j = 0; j < kSlotParams; ++j) f.norm[(size_t) j] = apvts.getRawParameterValue (slotParamId (e.slot, j))->load();
+        s.rack.fx.push_back (f);
+    }
+    s.blend = masterRaw[kBlend]->load();  s.vol = masterRaw[kVol]->load();
+    s.pan = masterRaw[kPan]->load();      s.rev = masterRaw[kRev]->load();
+    s.valid = true;
+    return s;
+}
+
+void ModularFXAudioProcessor::applySnapshot (const RackSnapshot& s)
+{
+    if (! s.valid) return;
+    applyPreset (s.rack, false);
+    auto setReal = [this] (const char* id, float v)
+    {
+        if (auto* p = apvts.getParameter (id)) p->setValueNotifyingHost (p->convertTo0to1 (v));
+    };
+    setReal ("M_BLEND", s.blend);  setReal ("M_VOL", s.vol);  setReal ("M_PAN", s.pan);  setReal ("M_REV", s.rev);
+}
+
+void ModularFXAudioProcessor::updateHistory (bool force)
+{
+    const auto cur = captureSnapshot();
+    if (! committed.valid) { committed = lastSeen = cur; return; }
+
+    if (! cur.sameAs (lastSeen)) { lastSeen = cur; stableTicks = 0; }
+    else ++stableTicks;
+
+    // a change counts as one undo step once it has stopped moving for a moment (so a knob drag is one step)
+    if (! lastSeen.sameAs (committed) && (force || stableTicks >= 3))
+    {
+        undoStack.push_back (committed);
+        if (undoStack.size() > 100) undoStack.erase (undoStack.begin());
+        redoStack.clear();
+        committed = lastSeen;
+    }
+}
+
+void ModularFXAudioProcessor::undo()
+{
+    updateHistory (true);
+    if (undoStack.empty()) return;
+    redoStack.push_back (committed);
+    const auto target = undoStack.back();
+    undoStack.pop_back();
+    applySnapshot (target);
+    committed = lastSeen = captureSnapshot();
+    stableTicks = 0;
+}
+
+void ModularFXAudioProcessor::redo()
+{
+    updateHistory (true);
+    if (redoStack.empty()) return;
+    undoStack.push_back (committed);
+    const auto target = redoStack.back();
+    redoStack.pop_back();
+    applySnapshot (target);
+    committed = lastSeen = captureSnapshot();
+    stableTicks = 0;
+}
+
+void ModularFXAudioProcessor::switchAB (int slot)
+{
+    slot = juce::jlimit (0, 1, slot);
+    if (slot == activeAB) return;
+    updateHistory (true);
+    abSlots[(size_t) activeAB] = captureSnapshot();
+    if (! abSlots[(size_t) slot].valid) abSlots[(size_t) slot] = abSlots[(size_t) activeAB];    // first visit: start from the same sound
+    applySnapshot (abSlots[(size_t) slot]);
+    activeAB = slot;
 }
