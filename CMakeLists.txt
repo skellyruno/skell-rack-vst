@@ -12,6 +12,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JUCE)
 
+# SkellCore guided onboarding; pinned shared UI only.
+FetchContent_Declare(SkellCoreTour
+  GIT_REPOSITORY https://github.com/skellyruno/skell-vst-template.git
+  GIT_TAG 3306ad495c93e062e39b8abbf079534b0b53da4e
+  GIT_SHALLOW FALSE
+  SOURCE_SUBDIR SkellCore)
+FetchContent_MakeAvailable(SkellCoreTour)
 juce_add_plugin(ModularFXSuite
     COMPANY_NAME "SkellAudio"
     IS_SYNTH FALSE
@@ -60,6 +67,7 @@ target_compile_definitions(ModularFXSuite
 
 target_link_libraries(ModularFXSuite
     PRIVATE
+        SkellCore::UI
         juce::juce_audio_utils
         juce::juce_dsp
     PUBLIC
