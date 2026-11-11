@@ -1,0 +1,53 @@
+name: Modular FX Suite / GuidedTour Windows and actual JUCE screenshots
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  windows-vst3:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure real plugin
+        run: cmake -S . -B build -A x64
+      - name: Build Windows VST3 and Standalone
+        run: cmake --build build --config Release --parallel 2
+      - name: Verify real VST3 artifact
+        shell: pwsh
+        run: |
+          $plugin = Get-ChildItem build -Recurse -Directory -Filter '*.vst3' | Select-Object -First 1
+          if (-not $plugin) { throw 'Missing ModularFXSuite VST3' }
+  ui-tour:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install real-editor build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build xvfb xauth pkg-config libasound2-dev libjack-jackd2-dev \
+            libfreetype6-dev libfontconfig1-dev libx11-dev libxext-dev \
+            libxinerama-dev libxcursor-dev libxrandr-dev libxcomposite-dev \
+            libxrender-dev libgl1-mesa-dev libglu1-mesa-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libgtk-3-dev
+      - name: Configure actual-editor test
+        run: cmake -S . -B build-ui -G Ninja -DCMAKE_BUILD_TYPE=Release -DSKELL_RACK_UI_TOUR_SCREENSHOTS=ON
+      - name: Build renderer
+        run: cmake --build build-ui --target SkellRackTourScreenshots --parallel 2
+      - name: Test four real screenshots
+        run: |
+          set -euo pipefail
+          renderer=$(find build-ui -type f -name SkellRackTourScreenshots -executable | head -n 1)
+          test -n "$renderer"
+          xvfb-run -a -s '-screen 0 1920x1080x24' "$renderer" --output ui-tour-screenshots
+          test "$(find ui-tour-screenshots -name '*.png' | wc -l)" -eq 4
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ModularFXSuite-GuidedTour-Real-Editor
+          path: ui-tour-screenshots/
+          if-no-files-found: warn
+          retention-days: 14

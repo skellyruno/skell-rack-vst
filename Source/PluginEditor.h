@@ -6,6 +6,7 @@
 #include "MasterPanels.h"
 #include "Meters.h"
 #include "PresetBrowser.h"
+#include <SkellCore/GuidedTour.h>
 
 // Mouse wheel scrolls the rack sideways.
 class RackViewport : public juce::Viewport
@@ -85,6 +86,8 @@ public:
     }
     MeterStrip& getMeterStrip() noexcept { return meters; }
     void refreshHistoryButtons();
+    void dismissTourForScreenshot(){guidedTour.dismiss();}
+    bool replayTourForScreenshot(){showGuidedTour(false);return guidedTour.isShowing();}
 
 private:
     void timerCallback() override { audioProcessor.updateHistory(); refreshHistoryButtons(); }
@@ -115,5 +118,8 @@ private:
     RackViewport viewport;
     std::array<std::unique_ptr<ModuleCardBase>, kMaxRack> cards;     // one per slot
     PresetBrowser presetBrowser;
-    EffectBrowser browser;                                           // overlay, hidden until Add Effect is clicked
+    EffectBrowser browser;
+    juce::TextButton helpTour{"?"};
+    skellcore::ui::GuidedTourController guidedTour{*this,"skell-rack-vst",1};
+    void showGuidedTour(bool firstRun);                                           // overlay, hidden until Add Effect is clicked
 };

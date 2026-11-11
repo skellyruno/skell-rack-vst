@@ -11,6 +11,10 @@ ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProce
     addAndMakeVisible(content);
 
     content.addAndMakeVisible(meters);
+    helpTour.setButtonText("?");
+    helpTour.setTooltip("Help / Show Tutorial");
+    helpTour.onClick=[this]{showGuidedTour(false);};
+    content.addAndMakeVisible(helpTour);
     auto arrow = [](bool undo) { return [undo](juce::Graphics& g, juce::Rectangle<float> r, bool over, bool, bool) {
         auto c = r.reduced(4.0f);
         g.setColour(juce::Colour(over ? 0xFF30333B : 0xFF23262C)); g.fillRoundedRectangle(r, 8.0f);
@@ -63,6 +67,7 @@ ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProce
     if (auto* cb = getConstrainer()) cb->setFixedAspectRatio((double) kNativeW / (double) kNativeH);
     setSize(juce::roundToInt((float) kNativeW * scale), juce::roundToInt((float) kNativeH * scale));
     layoutRack();
+    showGuidedTour(true);
 }
 
 ModularFXAudioProcessorEditor::~ModularFXAudioProcessorEditor()
@@ -71,6 +76,30 @@ ModularFXAudioProcessorEditor::~ModularFXAudioProcessorEditor()
     audioProcessor.rackChanged.removeChangeListener(this);
 }
 
+void ModularFXAudioProcessorEditor::showGuidedTour(bool firstRun)
+{
+    std::vector<skellcore::ui::GuidedTourStep> steps;
+    steps.emplace_back(&presetPanel,"START WITH A PRESET",
+        "Load a preset or save your own effect-rack setup.");
+    if(addTile.isVisible())
+        steps.emplace_back(&addTile,"ADD AN EFFECT",
+            "Use Add Effect to browse available modules and build your chain.");
+    steps.emplace_back(&viewport,"YOUR EFFECT RACK",
+        "Effect cards process audio in order. Drag cards to change their routing.");
+    steps.emplace_back(&outputPanel,"FINAL OUTPUT",
+        "Adjust overall output and check levels after your effects.");
+    steps.emplace_back(&abButtonA,"COMPARE A AND B",
+        "A and B keep two versions of your rack for fast comparison.",
+        std::function<void()>{},&abButtonB);
+    steps.emplace_back(&undoButton,"UNDO CHANGES",
+        "Undo or redo edits if you want to try a different rack arrangement.",
+        std::function<void()>{},&redoButton);
+    guidedTour.setPalette({juce::Colour(0xff22c7db),juce::Colour(0xff181a1f),
+        juce::Colours::white,juce::Colour(0xffa2aebd),juce::Colour(0xd9000000)});
+    guidedTour.setSteps(std::move(steps));
+    if(firstRun)guidedTour.startIfFirstRun();
+    else guidedTour.replay();
+}
 void ModularFXAudioProcessorEditor::paintNative(juce::Graphics& g)
 {
     g.fillAll(juce::Colour(0xFF0F1013));
