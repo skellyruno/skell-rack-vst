@@ -86,6 +86,8 @@ public:
     }
     MeterStrip& getMeterStrip() noexcept { return meters; }
     void refreshHistoryButtons();
+    void dismissTourForScreenshot(){guidedTour.dismiss();}
+    bool replayTourForScreenshot(){showGuidedTour(false);return guidedTour.isShowing();}
 
 private:
     void timerCallback() override { audioProcessor.updateHistory(); refreshHistoryButtons(); }
