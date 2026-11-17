@@ -1,36 +1,126 @@
-name: Build VST3 Plugin
+name: Build Windows VST3 preview
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'CMakeLists.txt'
+      - 'Source/**'
+      - 'tests/**'
+      - 'tools/**'
+      - '.github/workflows/build.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'CMakeLists.txt'
+      - 'Source/**'
+      - 'tests/**'
+      - 'tools/**'
+      - '.github/workflows/build.yml'
   workflow_dispatch:
+
+# Only newer PR checks may cancel older PR checks. Main and manual runs are protected.
+concurrency:
+  group: modularfx-windows-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest]
+    name: Windows x64 VST3 release preview
+    runs-on: windows-latest
+    env:
+      SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
-    - name: Checkout repository recursively
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-    - name: Configure CMake
-      run: >
-        cmake -B build
-        -DCMAKE_BUILD_TYPE=Release
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-    - name: Build Plugin Target
-      run: cmake --build build --config Release
+      - name: Configure x64 Release
+        run: cmake -S . -B build -A x64 -DCMAKE_BUILD_TYPE=Release
 
-    # Package Windows build outputs as downloadable artifacts
-    - name: Upload Windows VST3 Artifact
-      if: runner.os == 'Windows'
-      uses: actions/upload-artifact@v4
-      with:
-        name: ModularFXSuite-VST3-Windows
-        path: build/ModularFXSuite_artefacts/Release/VST3/*.vst3
+      - name: Build Windows VST3
+        run: cmake --build build --config Release --parallel 2
 
+      - name: Test release packager
+        run: python -m unittest discover -s tests -p "test_vst3_packager.py" -v
+
+      - name: Package one Windows VST3 bundle
+        run: >
+          python tools/package_vst3.py
+          --build-root "build/ModularFXSuite_artefacts/Release/VST3"
+          --output "ModularFXSuite-Windows-VST3.zip"
+          --expected-name "Modular FX Suite"
+          --expected-version "1.0.0"
+          --expected-vendor "SkellAudio"
+
+      - name: Extract the exact package for pluginval
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path $PWD 'pluginval-stage'
+          if (Test-Path -LiteralPath $stage) { throw "Refusing to reuse existing staging directory: $stage" }
+          New-Item -ItemType Directory -Path $stage | Out-Null
+          Expand-Archive -LiteralPath 'ModularFXSuite-Windows-VST3.zip' -DestinationPath $stage
+          $bundles = @(Get-ChildItem -LiteralPath $stage -Directory -Filter '*.vst3')
+          if ($bundles.Count -ne 1) { throw "Expected exactly one staged VST3 bundle, found $($bundles.Count)" }
+          $binary = Join-Path $bundles[0].FullName 'Contents/x86_64-win/Modular FX Suite.vst3'
+          if (-not (Test-Path -LiteralPath $binary -PathType Leaf)) { throw "Expected Windows module is missing: $binary" }
+          $moduleInfo = Get-Content -LiteralPath (Join-Path $bundles[0].FullName 'Contents/Resources/moduleinfo.json') -Raw | ConvertFrom-Json
+          if ($moduleInfo.Name -ne 'Modular FX Suite' -or $moduleInfo.Version -ne '1.0.0') { throw 'Staged VST3 identity/version mismatch' }
+          "PLUGINVAL_BUNDLE=$($bundles[0].FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install pinned pluginval 1.0.4
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri 'https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Windows.zip' -OutFile pluginval_Windows.zip
+          Expand-Archive -LiteralPath pluginval_Windows.zip -DestinationPath pluginval
+          $validator = Get-ChildItem -LiteralPath pluginval -Recurse -File -Filter 'pluginval.exe' | Select-Object -First 1
+          if (-not $validator) { throw 'Official pluginval 1.0.4 executable was not found' }
+          "PLUGINVAL_EXE=$($validator.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Validate packaged VST3 (strictness 5)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $reportDir = Join-Path $PWD 'pluginval-reports'
+          New-Item -ItemType Directory -Path $reportDir -Force | Out-Null
+          $stdoutPath = Join-Path $reportDir 'pluginval.stdout.log'
+          $stderrPath = Join-Path $reportDir 'pluginval.stderr.log'
+          $argumentLine = '--strictness-level 5 --validate-in-process --output-dir "{0}" "{1}"' -f $reportDir, $env:PLUGINVAL_BUNDLE
+          $process = Start-Process -FilePath $env:PLUGINVAL_EXE -ArgumentList $argumentLine -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+          if (Test-Path -LiteralPath $stdoutPath) { Get-Content -LiteralPath $stdoutPath | ForEach-Object { Write-Host $_ } }
+          if (Test-Path -LiteralPath $stderrPath) { Get-Content -LiteralPath $stderrPath | ForEach-Object { Write-Host $_ } }
+          if ($process.ExitCode -ne 0) { throw "pluginval strictness 5 failed with exit code $($process.ExitCode)" }
+          $reports = @(Get-ChildItem -LiteralPath $reportDir -File -Filter '*.txt')
+          if ($reports.Count -ne 1) { throw "Expected exactly one pluginval text report, found $($reports.Count)" }
+          $reportText = Get-Content -LiteralPath $reports[0].FullName -Raw
+          if (-not $reportText.Trim().EndsWith('SUCCESS') -or $reportText.Contains('FAILURE')) { throw 'pluginval report does not end in a clean SUCCESS marker' }
+
+      - name: Upload pluginval diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ModularFXSuite-pluginval-report
+          path: pluginval-reports/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload private Windows VST3 preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: ModularFXSuite-Windows-VST3-preview
+          path: |
+            ModularFXSuite-Windows-VST3.zip
+            ModularFXSuite-Windows-VST3.manifest.json
+            ModularFXSuite-Windows-VST3.sha256
+          if-no-files-found: error
+          retention-days: 30
