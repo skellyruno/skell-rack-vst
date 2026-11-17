@@ -5,12 +5,17 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
-FetchContent_Declare(
-    JUCE
-    GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-    GIT_TAG        8.0.0
-)
-FetchContent_MakeAvailable(JUCE)
+if(DEFINED JUCE_PATH AND EXISTS "${JUCE_PATH}/CMakeLists.txt")
+    add_subdirectory("${JUCE_PATH}" JUCE)
+else()
+    FetchContent_Declare(
+        JUCE
+        GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+        GIT_TAG        8.0.12
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(JUCE)
+endif()
 
 # SkellCore guided onboarding; pinned shared UI only.
 FetchContent_Declare(SkellCoreTour
@@ -26,10 +31,11 @@ juce_add_plugin(ModularFXSuite
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
-    COPY_PLUGIN_AFTER_BUILD TRUE
+    COPY_PLUGIN_AFTER_BUILD FALSE
     PLUGIN_MANUFACTURER_CODE Skel
     PLUGIN_CODE Mfx1
-    FORMATS VST3 AU Standalone
+    # Windows-first release contract: ship VST3 only.
+    FORMATS VST3
     PRODUCT_NAME "Modular FX Suite"
 )
 
