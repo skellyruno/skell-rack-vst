@@ -79,3 +79,8 @@ Fastest: drag a `.json` (BandLab or Skelly extractor export) or `.mfxpreset` ont
 
 In the preset browser choose **Import... > BandLab preset file (.json)** or **BandLab preset from clipboard**. The clipboard option takes either the preset JSON or a `bandlab.com/effect-presets/...` link. The link download is best-effort: BandLab has no documented public endpoint, so if it fails the plug-in tells you and you can paste the JSON instead. Supported BandLab effects: compressor, expGate, deEsser, threeBandEq, ddelay (D-Delay), bossGE7 (Graphic EQ), stereoSpreader, simpleStudioReverb (approximated by Reverb), pingpongDelay and delay (as Delay) and gain. Anything else is skipped and listed after the import. Times, percentages and dB values are converted to the plug-in's units.
 - A and B, and the latest 12 undo steps, are saved with the project, so you can reopen it and keep comparing.
+
+
+## Windows release preview (November 2026)
+
+The release target is Windows x64 VST3 only; AU and Standalone are excluded from the distributable. JUCE is pinned to 8.0.12. The Windows Actions workflow builds the VST3, tests the fail-closed packager, validates the staged package with pluginval strictness 5, and uploads a flat private preview ZIP with provenance and SHA-256 sidecars. These artifacts are not commercial release approval. See [docs/WINDOWS_RELEASE.md](docs/WINDOWS_RELEASE.md) for the exact package contract and outstanding FL Studio, audio, licensing, contact, installer and rollback gates.
