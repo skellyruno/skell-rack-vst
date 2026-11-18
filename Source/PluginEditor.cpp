@@ -1,8 +1,14 @@
 #include "PluginEditor.h"
 
-namespace { constexpr int kTopBar = 46; constexpr int kPad = 10; constexpr int kLeftW = 200; constexpr int kRightW = 150; constexpr int kCentreW = 880; }
-
-namespace { constexpr int kNativeW = kLeftW + kCentreW + kRightW; constexpr int kNativeH = kTopBar + kCardH + 2 * kPad + 12; }
+namespace {
+constexpr int kTopBar = rackui::topBar;
+constexpr int kPad = rackui::pad;
+constexpr int kLeftW = rackui::leftWidth;
+constexpr int kRightW = rackui::rightWidth;
+constexpr int kCentreW = rackui::centreWidth;
+constexpr int kNativeW = rackui::nativeWidth;
+constexpr int kNativeH = rackui::nativeHeight;
+}
 
 ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProcessor& p)
     : AudioProcessorEditor(&p), audioProcessor(p), meters(p), presetPanel(p), outputPanel(p), presetBrowser(p)
