@@ -77,6 +77,8 @@ class Vst3PackagerTests(unittest.TestCase):
         self.assertEqual(manifest["format"], "VST3")
         self.assertEqual(manifest["architecture"], "AMD64")
         self.assertTrue(manifest["preview_only"])
+        self.assertTrue(any("owner-machine installation" in gate for gate in manifest["release_gates"]))
+        self.assertTrue(any("SkellyHub install/update" in gate for gate in manifest["release_gates"]))
         self.assertEqual(manifest["product"], PRODUCT)
         self.assertEqual(manifest["version"], VERSION)
         self.assertTrue(self.output.is_file())

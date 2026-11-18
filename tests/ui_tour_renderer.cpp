@@ -14,10 +14,10 @@ int main(int argc,char** argv){
   skellcore::ui::headless::Options options;
   options.project="Skell Rack actual JUCE GuidedTour";
   options.scenes={
-      {"compact-normal",820,440,0,0,false},
-      {"compact-tour",820,440,0,1,false},
-      {"default-normal",1230,660,0,0,false},
-      {"default-tour",1230,660,0,1,false}
+      {"compact-normal",820,rackui::heightForWidth(820),0,0,false},
+      {"compact-tour",820,rackui::heightForWidth(820),0,1,false},
+      {"default-normal",rackui::nativeWidth,rackui::nativeHeight,0,0,false},
+      {"default-tour",rackui::nativeWidth,rackui::nativeHeight,0,1,false}
   };
   int failures=0;
   options.configure=[&](const skellcore::ui::headless::Scene& scene){

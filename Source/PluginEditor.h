@@ -8,6 +8,21 @@
 #include "PresetBrowser.h"
 #include <SkellCore/GuidedTour.h>
 
+namespace rackui
+{
+inline constexpr int topBar = 46;
+inline constexpr int pad = 10;
+inline constexpr int leftWidth = 200;
+inline constexpr int rightWidth = 150;
+inline constexpr int centreWidth = 880;
+inline constexpr int nativeWidth = leftWidth + centreWidth + rightWidth;
+inline constexpr int nativeHeight = topBar + kCardH + 2 * pad + 12;
+constexpr int heightForWidth(int width) noexcept
+{
+    return (width * nativeHeight + nativeWidth / 2) / nativeWidth;
+}
+}
+
 // Mouse wheel scrolls the rack sideways.
 class RackViewport : public juce::Viewport
 {
