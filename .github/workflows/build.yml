@@ -8,6 +8,9 @@ on:
       - 'Source/**'
       - 'tests/**'
       - 'tools/**'
+      - 'scripts/**'
+      - 'docs/**'
+      - 'README.md'
       - '.github/workflows/build.yml'
   push:
     branches: [main]
@@ -16,6 +19,9 @@ on:
       - 'Source/**'
       - 'tests/**'
       - 'tools/**'
+      - 'scripts/**'
+      - 'docs/**'
+      - 'README.md'
       - '.github/workflows/build.yml'
   workflow_dispatch:
 
@@ -59,6 +65,13 @@ jobs:
           --expected-name "Modular FX Suite"
           --expected-version "1.0.0"
           --expected-vendor "SkellAudio"
+ 
+      - name: Test private-preview install/update and rollback
+        shell: pwsh
+        run: >
+          pwsh -NoProfile -File scripts/Test-Install-ModularFXSuite.ps1
+          -PackagePath ModularFXSuite-Windows-VST3.zip
+          -InstallerPath scripts/Install-ModularFXSuite.ps1
 
       - name: Extract the exact package for pluginval
         shell: pwsh
@@ -122,5 +135,7 @@ jobs:
             ModularFXSuite-Windows-VST3.zip
             ModularFXSuite-Windows-VST3.manifest.json
             ModularFXSuite-Windows-VST3.sha256
+            scripts/Install-ModularFXSuite.ps1
+            docs/WINDOWS-INSTALL.txt
           if-no-files-found: error
           retention-days: 30

@@ -286,14 +286,14 @@ def package_vst3(
             "Real musical A/B and target-hardware CPU/latency acceptance remain outstanding.",
             "Product and dependency licensing/attribution review remains outstanding.",
             "Vendor URL and support email require owner-approved values.",
-            "Installer, SkellyHub install/update, backup and rollback are not verified.",
+            "Per-user Windows install/update/rollback helper is included and CI self-tested; user-machine FL Studio and SkellyHub integration remain outstanding.",
         ],
     }
     build_info_bytes = (json.dumps(build_info, indent=2, sort_keys=True) + "\n").encode("utf-8")
     preview_bytes = (
         "PRIVATE PREVIEW ONLY — NOT APPROVED FOR COMMERCIAL DISTRIBUTION.\n"
-        "Windows x64 VST3 package. FL Studio, musical A/B, licensing, vendor contact, "
-        "installer and SkellyHub rollback gates remain outstanding.\n"
+        "Windows x64 VST3 private preview. The per-user installer/rollback helper is CI-tested, "
+        "but FL Studio, musical A/B, licensing, vendor contact and SkellyHub integration remain outstanding.\n"
     ).encode("utf-8")
 
     try:

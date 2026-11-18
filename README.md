@@ -83,4 +83,8 @@ In the preset browser choose **Import... > BandLab preset file (.json)** or **Ba
 
 ## Windows release preview (November 2026)
 
-The release target is Windows x64 VST3 only; AU and Standalone are excluded from the distributable. JUCE is pinned to 8.0.12. The Windows Actions workflow builds the VST3, tests the fail-closed packager, validates the staged package with pluginval strictness 5, and uploads a flat private preview ZIP with provenance and SHA-256 sidecars. These artifacts are not commercial release approval. See [docs/WINDOWS_RELEASE.md](docs/WINDOWS_RELEASE.md) for the exact package contract and outstanding FL Studio, audio, licensing, contact, installer and rollback gates.
+The release target is Windows x64 VST3 only; AU and Standalone are excluded from the distributable. JUCE is pinned to 8.0.12. The Windows Actions workflow builds the VST3, tests the fail-closed packager, validates the staged package with pluginval strictness 5, and uploads a flat private preview ZIP with provenance and SHA-256 sidecars.
+
+The Actions artifact also includes `scripts/Install-ModularFXSuite.ps1` and `docs/WINDOWS-INSTALL.txt`. The PowerShell 7 helper verifies the archive, provenance and embedded file checksums, then supports per-user install/update with a verified backup and rollback. Its dry-run, fresh-install, idempotence, update, rollback, tamper-rejection and path-safety checks run in Windows CI against the exact preview package.
+
+These artifacts are private-preview candidates, not commercial release approval. See [docs/WINDOWS_RELEASE.md](docs/WINDOWS_RELEASE.md) for the package contract and outstanding FL Studio, audio, licensing, contact and SkellyHub gates.

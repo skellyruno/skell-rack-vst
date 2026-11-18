@@ -1,0 +1,49 @@
+MODULAR FX SUITE — WINDOWS PRIVATE-PREVIEW INSTALL / ROLLBACK
+
+STATUS: PRIVATE PREVIEW ONLY. NOT APPROVED FOR COMMERCIAL DISTRIBUTION.
+
+REQUIREMENTS
+- Windows 10/11 x64.
+- PowerShell 7 (pwsh).
+- The complete GitHub Actions preview artifact extracted to one folder. Keep these files together:
+  ModularFXSuite-Windows-VST3.zip
+  ModularFXSuite-Windows-VST3.manifest.json
+  ModularFXSuite-Windows-VST3.sha256
+  scripts\Install-ModularFXSuite.ps1
+  docs\WINDOWS-INSTALL.txt
+
+DRY RUN FIRST
+Open PowerShell 7 in the extracted artifact folder and run:
+
+  pwsh -NoProfile -File .\scripts\Install-ModularFXSuite.ps1 -PackagePath .\ModularFXSuite-Windows-VST3.zip -WhatIf
+
+The helper verifies the outer archive SHA-256, provenance manifest, embedded SHA256SUMS, VST3 identity/class IDs, AMD64 PE32+ module and package layout before it reports the proposed per-user install. WhatIf does not create the VST3 destination or backup directory.
+
+INSTALL
+Close FL Studio and other VST3 hosts before replacing an existing copy. After reviewing the dry-run output, run:
+
+  pwsh -NoProfile -File .\scripts\Install-ModularFXSuite.ps1 -PackagePath .\ModularFXSuite-Windows-VST3.zip
+
+The helper requests confirmation. It installs only for the current Windows user, by default to:
+
+  %LOCALAPPDATA%\Programs\Common\VST3\Modular FX Suite.vst3
+
+Before replacing a different existing copy, it creates and verifies a timestamped backup under:
+
+  %LOCALAPPDATA%\Skell Audio\Backups\Modular FX Suite
+
+It stages and verifies the new bundle before the directory swap, checks the installed tree after the swap, and restores the prior directory if the replacement fails. It does not elevate, edit the registry, install a background updater or write into Program Files.
+
+ROLLBACK
+Use the exact backup folder printed by the installer:
+
+  pwsh -NoProfile -File .\scripts\Install-ModularFXSuite.ps1 -Rollback -BackupPath "<verified-backup-folder>"
+
+Rollback verifies the backup manifest and bundle tree before use. If a current installation exists, that installation is itself backed up before rollback. User-modified or tampered backups are rejected.
+
+IMPORTANT LIMITATIONS
+- This is an unsigned private preview, not a signed installer or commercial release.
+- The helper's install/update/rollback flow is exercised in Windows CI; that does not verify your local FL Studio scan/load, project reopen, preset/state/automation recall, audio A/B, or target-machine CPU/latency.
+- The repository's final product/source licensing and third-party attribution review, vendor URL, support email and commercial terms still require owner approval.
+- SkellyHub discovery/update integration is not included in this helper.
+- If a host is using the plugin, close it before updating. Do not delete your existing backups until the new build has been accepted.
