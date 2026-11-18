@@ -2,7 +2,7 @@ name: Build Windows VST3 preview
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, release/windows-vst3-only-juce812-20261117]
     paths:
       - 'CMakeLists.txt'
       - 'Source/**'

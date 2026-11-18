@@ -139,9 +139,13 @@ function Get-EntryPrefix {
     $stream = $Entry.Open()
     try {
         $buffer = [byte[]]::new($Count)
-        $read = $stream.Read($buffer, 0, $buffer.Length)
-        if ($read -lt $Count) { throw "Truncated Windows module: $($Entry.FullName)" }
-        return $buffer
+        $read = 0
+        while ($read -lt $Count) {
+            $chunk = $stream.Read($buffer, $read, $Count - $read)
+            if ($chunk -le 0) { throw "Truncated Windows module: $($Entry.FullName)" }
+            $read += $chunk
+        }
+        return ,$buffer
     } finally {
         $stream.Dispose()
     }
@@ -193,8 +197,8 @@ function Assert-ModuleIdentity {
         if ($cid -notmatch '^[0-9A-Fa-f]{32}$') { throw 'VST3 class ID must contain exactly 32 hexadecimal characters.' }
         if (-not $ids.Add($cid)) { throw "Duplicate VST3 class ID: $cid" }
         if ($class['Name'] -ne $script:ProductName) { throw 'VST3 class name does not match the product.' }
-        if ($class.Contains('Vendor') -and $class['Vendor'] -ne $script:VendorName) { throw 'VST3 class vendor does not match the product.' }
-        if ($class.Contains('Version') -and [string]$class['Version'] -ne $version) { throw 'VST3 class version does not match the product.' }
+        if (($class.Keys -contains 'Vendor') -and $class['Vendor'] -ne $script:VendorName) { throw 'VST3 class vendor does not match the product.' }
+        if (($class.Keys -contains 'Version') -and [string]$class['Version'] -ne $version) { throw 'VST3 class version does not match the product.' }
         $category = [string]$class['Category']
         if ([string]::IsNullOrWhiteSpace($category)) { throw 'VST3 class category is missing.' }
         [void]$categories.Add($category)
@@ -327,8 +331,9 @@ function Get-PackagePlan {
         )) {
             if ($buildInfo[$pair[0]] -ne $pair[1]) { throw "Build provenance field $($pair[0]) is invalid." }
         }
-        if ($buildInfo['preview_only'] -ne $true -or [int]$buildInfo['pluginval_strictness_required'] -lt 5) {
-            throw 'Build provenance must identify a private preview validated at pluginval strictness 5 or higher.'
+        if ($buildInfo['preview_only'] -ne $true -or [int]$buildInfo['pluginval_strictness_required'] -lt 5 -or
+            [int]$releaseManifest['pluginval_strictness_required'] -lt 5) {
+            throw 'Build provenance and release manifest must identify a private preview validated at pluginval strictness 5 or higher.'
         }
         if ([string]$buildInfo['source_commit'] -notmatch '^[0-9a-fA-F]{40}$' -or
             [string]$buildInfo['ci_checkout_commit'] -notmatch '^[0-9a-fA-F]{40}$') {
@@ -344,6 +349,13 @@ function Get-PackagePlan {
         $modulePath = "$($script:BundleName)/$($script:ModuleRelativePath)"
         if (-not $entries.ContainsKey($moduleInfoPath) -or -not $entries.ContainsKey($modulePath)) {
             throw 'Expected VST3 moduleinfo.json or Windows x64 module is missing.'
+        }
+        $moduleEntries = @($entries.Keys | Where-Object { $_.EndsWith('.vst3', [StringComparison]::OrdinalIgnoreCase) })
+        if ($moduleEntries.Count -ne 1 -or $moduleEntries[0] -ne $modulePath) {
+            throw 'Package must contain exactly one Windows VST3 module binary at the expected path.'
+        }
+        foreach ($entryName in $entries.Keys) {
+            if ($entryName -match '/[^/]+\\.vst3/') { throw "Nested VST3 bundle is not allowed: $entryName" }
         }
         $moduleInfo = Read-StrictJsonObject -Text (Get-EntryText -Entry $entries[$moduleInfoPath]) -Label 'moduleinfo'
         $version = Assert-ModuleIdentity -ModuleInfo $moduleInfo -ExpectedVersion ([string]$buildInfo['version'])
@@ -380,7 +392,12 @@ function Get-PackagePlan {
 
         Assert-Pe64Bytes -Bytes (Get-EntryPrefix -Entry $entries[$modulePath]) -Label $modulePath
         $prefix = "$($script:BundleName)/"
-        $treeRecords = foreach ($path in ($checksums.Keys | Where-Object { $_.StartsWith($prefix, [StringComparison]::Ordinal) } | Sort-Object)) {
+        $bundlePaths = [System.Collections.Generic.List[string]]::new()
+        foreach ($path in $checksums.Keys) {
+            if ($path.StartsWith($prefix, [StringComparison]::Ordinal)) { $bundlePaths.Add($path) }
+        }
+        $bundlePaths.Sort([StringComparer]::Ordinal)
+        $treeRecords = foreach ($path in $bundlePaths) {
             "$($checksums[$path])  $($path.Substring($prefix.Length))"
         }
         if (@($treeRecords).Count -lt 2) { throw 'VST3 bundle contains too few files.' }
@@ -414,7 +431,7 @@ function Copy-BundleFromPackage {
         foreach ($entry in $zip.Entries) {
             if (-not $entry.FullName.StartsWith($prefix, [StringComparison]::Ordinal)) { continue }
             $relative = $entry.FullName.Substring($prefix.Length)
-            $destination = [IO.Path]::GetFullPath((Join-Path $bundleRoot $relative.Replace('/', [IO.Path]::DirectorySeparatorChar)))
+            $destination = [IO.Path]::GetFullPath((Join-Path $bundleRoot ($relative.Replace('/', [IO.Path]::DirectorySeparatorChar))))
             if (-not $destination.StartsWith($bundleFull, [StringComparison]::OrdinalIgnoreCase)) {
                 throw "Extraction path escaped the staging bundle: $($entry.FullName)"
             }
@@ -467,8 +484,10 @@ function Invoke-Install {
     $id = [guid]::NewGuid().ToString('N')
     $backupDirectory = $null
     if ($null -ne $previous) {
-        if (Test-Path -LiteralPath $backupFull) { Assert-NoReparsePoints -Path $backupFull }
-        else { New-Item -ItemType Directory -Path $backupFull -Force | Out-Null }
+        if (Test-Path -LiteralPath $backupFull) {
+            if (-not (Test-Path -LiteralPath $backupFull -PathType Container)) { throw 'Backup root is not a directory.' }
+            Assert-NoReparsePoints -Path $backupFull
+        } else { New-Item -ItemType Directory -Path $backupFull -Force | Out-Null }
         $backupDirectory = Join-Path $backupFull ("previous-" + (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssfffZ') + '-' + $id)
         New-Item -ItemType Directory -Path $backupDirectory | Out-Null
         Copy-Item -LiteralPath $target -Destination $backupDirectory -Recurse
@@ -556,6 +575,7 @@ function Invoke-Rollback {
     $backupFull = [IO.Path]::GetFullPath($BackupPath)
     $backupRootFull = [IO.Path]::GetFullPath($BackupRoot)
     Assert-PathInside -Root $backupRootFull -Candidate $backupFull -Description 'Backup path'
+    if (Test-Path -LiteralPath $backupRootFull) { Assert-NoReparsePoints -Path $backupRootFull }
     if (-not (Test-Path -LiteralPath $backupFull -PathType Container)) { throw "Backup directory not found: $backupFull" }
     Assert-NoReparsePoints -Path $backupFull
     $manifestPath = Join-Path $backupFull 'backup-manifest.json'

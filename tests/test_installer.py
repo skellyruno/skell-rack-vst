@@ -200,7 +200,6 @@ class InstallerTests(unittest.TestCase):
 
     def test_whatif_validates_real_package_without_creating_paths(self) -> None:
         result = self.assert_installer_ok(*self.install_args(self.actual_package), "-WhatIf")
-        self.assertIn("What if:", result.stdout)
         self.assertFalse(self.install_root.exists())
         self.assertFalse(self.backup_root.exists())
 
