@@ -32,6 +32,30 @@ jobs:
     - name: Build Plugin and Preset Regression Target
       run: cmake --build build --config Release
 
+    - name: Set up Python for VST3 metadata validation
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    # JUCE emits trailing commas in moduleinfo.json; normalize only the manifest,
+    # then require strict JSON and the exact shipping plugin identity before upload.
+    - name: Normalize and validate VST3 metadata as strict JSON
+      shell: pwsh
+      run: |
+        $vst = Get-ChildItem -Path build/ModularFXSuite_artefacts/Release/VST3 -Directory -Filter '*.vst3' | Select-Object -First 1
+        if (-not $vst) { throw 'Shipping Modular FX Suite VST3 bundle missing' }
+        $moduleinfo = Join-Path $vst.FullName 'Contents/Resources/moduleinfo.json'
+        if (-not (Test-Path -LiteralPath $moduleinfo -PathType Leaf)) { throw 'VST3 moduleinfo.json missing' }
+        & python scripts/normalize_vst3_moduleinfo.py --self-test
+        if ($LASTEXITCODE -ne 0) { throw 'VST3 metadata normalizer self-test failed' }
+        & python scripts/normalize_vst3_moduleinfo.py $moduleinfo
+        if ($LASTEXITCODE -ne 0) { throw 'VST3 metadata normalization failed' }
+        $manifest = Get-Content -LiteralPath $moduleinfo -Raw | ConvertFrom-Json -ErrorAction Stop
+        if ($manifest.Name -ne 'Modular FX Suite' -or $manifest.Version -ne '1.0.0' -or $manifest.'Factory Info'.Vendor -ne 'SkellAudio') {
+          throw 'Unexpected Modular FX Suite VST3 identity or version'
+        }
+        if ($manifest.Classes.Count -ne 3) { throw 'Expected three unique VST3 classes' }
+
     - name: Run Preset XML Regression
       run: ctest --test-dir build -C Release --output-on-failure
 
