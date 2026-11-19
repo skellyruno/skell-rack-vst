@@ -2,7 +2,7 @@ name: Build VST3 Plugin
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, fix/preset-xml-nonfinite-sanitize-20261119]
   workflow_dispatch:
 
 concurrency:
