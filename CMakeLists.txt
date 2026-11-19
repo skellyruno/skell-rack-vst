@@ -4,6 +4,8 @@ project(ModularFXSuite VERSION 1.0.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+include(CTest)
+
 include(FetchContent)
 FetchContent_Declare(
     JUCE
@@ -87,4 +89,24 @@ if(SKELL_RACK_UI_TOUR_SCREENSHOTS)
     target_compile_features(SkellRackTourScreenshots PRIVATE cxx_std_17)
     target_compile_definitions(SkellRackTourScreenshots PRIVATE
       JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+endif()
+
+
+if(BUILD_TESTING)
+    juce_add_console_app(SkellRackPresetXmlTests PRODUCT_NAME "Skell Rack Preset XML Tests")
+    target_sources(SkellRackPresetXmlTests PRIVATE tests/preset_xml_sanitizer.cpp)
+    target_include_directories(SkellRackPresetXmlTests PRIVATE Source)
+    target_compile_features(SkellRackPresetXmlTests PRIVATE cxx_std_17)
+    target_compile_definitions(SkellRackPresetXmlTests PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+    )
+    target_link_libraries(SkellRackPresetXmlTests PRIVATE
+        juce::juce_audio_utils
+        juce::juce_dsp
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+    )
+    juce_generate_juce_header(SkellRackPresetXmlTests)
+    add_test(NAME SkellRackPresetXmlTests COMMAND SkellRackPresetXmlTests)
 endif()
