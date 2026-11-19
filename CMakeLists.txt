@@ -93,7 +93,8 @@ endif()
 
 
 if(BUILD_TESTING)
-    add_executable(SkellRackPresetXmlTests tests/preset_xml_sanitizer.cpp)
+    juce_add_console_app(SkellRackPresetXmlTests PRODUCT_NAME "Skell Rack Preset XML Tests")
+    target_sources(SkellRackPresetXmlTests PRIVATE tests/preset_xml_sanitizer.cpp)
     target_include_directories(SkellRackPresetXmlTests PRIVATE Source)
     target_compile_features(SkellRackPresetXmlTests PRIVATE cxx_std_17)
     target_compile_definitions(SkellRackPresetXmlTests PRIVATE
