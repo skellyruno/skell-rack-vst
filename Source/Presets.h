@@ -141,6 +141,24 @@ inline const std::vector<PresetDef>& getFactoryPresets()
     return presets;
 }
 
+// Factory names are reserved. User saves and imports must never create a
+// second browser entry with the same visible name as a built-in program.
+inline bool isFactoryPresetName (const juce::String& candidate)
+{
+    const auto name = candidate.trim();
+    if (name.isEmpty()) return false;
+    for (const auto& preset : getFactoryPresets())
+        if (preset.name.equalsIgnoreCase (name)) return true;
+    return false;
+}
+
+inline juce::String makeUserPresetNameForSave (const juce::String& requestedName)
+{
+    const auto name = requestedName.trim();
+    if (name.isEmpty()) return {};
+    return isFactoryPresetName (name) ? name + " (User)" : name;
+}
+
 // ---- user presets live as small XML files
 inline juce::File getUserPresetFolder()
 {
