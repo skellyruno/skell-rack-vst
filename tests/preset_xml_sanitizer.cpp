@@ -90,10 +90,10 @@ int main()
         if (factoryNames.contains (preset.name, true)) factoryNamesUnique = false;
         factoryNames.add (preset.name);
         factorySlotsValid = factorySlotsValid && preset.fx.size() <= (size_t) kMaxRack;
-        for (const auto& fx : preset.fx)
+        for (const auto& presetFx : preset.fx)
         {
-            factoryControlsValid = factoryControlsValid && getFxInfo (fx.type) != nullptr;
-            for (float value : fx.norm)
+            factoryControlsValid = factoryControlsValid && getFxInfo (presetFx.type) != nullptr;
+            for (float value : presetFx.norm)
                 factoryControlsValid = factoryControlsValid
                     && std::isfinite (value) && value >= 0.0f && value <= 1.0f;
         }
