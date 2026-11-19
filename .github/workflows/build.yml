@@ -1,7 +1,13 @@
 name: Build VST3 Plugin
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -23,8 +29,11 @@ jobs:
         cmake -B build
         -DCMAKE_BUILD_TYPE=Release
 
-    - name: Build Plugin Target
+    - name: Build Plugin and Preset Regression Target
       run: cmake --build build --config Release
+
+    - name: Run Preset XML Regression
+      run: ctest --test-dir build -C Release --output-on-failure
 
     # Package Windows build outputs as downloadable artifacts
     - name: Upload Windows VST3 Artifact

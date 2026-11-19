@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include <array>
+#include <cmath>
 #include <initializer_list>
 #include <utility>
 #include <vector>
@@ -162,6 +163,15 @@ inline std::unique_ptr<juce::XmlElement> presetToXml (const PresetDef& def)
     return xml;
 }
 
+inline float sanitizePresetNormValue (double value) noexcept
+{
+    // JUCE parses the literal "nan" as quiet_NaN; jlimit comparisons both
+    // evaluate false for NaN, so the unsanitized value would reach the rack.
+    return std::isfinite (value)
+        ? static_cast<float> (juce::jlimit (0.0, 1.0, value))
+        : 0.5f;
+}
+
 inline bool presetFromXml (const juce::XmlElement& xml, PresetDef& out)
 {
     if (! xml.hasTagName ("ModularFXPreset")) return false;
@@ -175,7 +185,7 @@ inline bool presetFromXml (const juce::XmlElement& xml, PresetDef& out)
         if (getFxInfo (f.type) == nullptr) continue;
         f.on = e->getIntAttribute ("on", 1) != 0;
         for (int i = 0; i < kSlotParams; ++i)
-            f.norm[(size_t) i] = juce::jlimit (0.0f, 1.0f, (float) e->getDoubleAttribute ("p" + juce::String (i), 0.5));
+            f.norm[(size_t) i] = sanitizePresetNormValue (e->getDoubleAttribute ("p" + juce::String (i), 0.5));
         out.fx.push_back (f);
         if ((int) out.fx.size() >= kMaxRack) break;
     }
