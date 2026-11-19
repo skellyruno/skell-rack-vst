@@ -477,11 +477,11 @@ void ModularFXAudioProcessor::processChunk (juce::AudioBuffer<float>& buf, const
                 {
                     float* d = buf.getWritePointer (ch);
                     const float* pre = preBuf.getReadPointer (ch);
-                    for (int i = 0; i < n; ++i)
+                    for (int sampleIndex = 0; sampleIndex < n; ++sampleIndex)
                     {
-                        const float w = (float) (i + 1) / (float) n;
+                        const float w = (float) (sampleIndex + 1) / (float) n;
                         const float k = wantOn ? w : 1.0f - w;
-                        d[i] = pre[i] + (d[i] - pre[i]) * k;
+                        d[sampleIndex] = pre[sampleIndex] + (d[sampleIndex] - pre[sampleIndex]) * k;
                     }
                 }
             running[(size_t) slot] = wantOn;
