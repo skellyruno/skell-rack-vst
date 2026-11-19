@@ -19,7 +19,7 @@ struct PresetDef
 {
     juce::String name;
     std::vector<PresetFx> fx;
-    juce::String tags;                 // comma separated: Vocal, Guitar, Drums, Mix, Creative, Utility
+    juce::String tags {};              // comma separated: Vocal, Guitar, Drums, Mix, Creative, Utility
 };
 
 // Start from the effect's defaults and override the named controls with real values (Hz, dB, %, choice index ...).
