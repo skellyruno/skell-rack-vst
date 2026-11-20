@@ -13,11 +13,22 @@ int main(int argc,char** argv){
   editor.dismissTourForScreenshot();
   skellcore::ui::headless::Options options;
   options.project="Skell Rack actual JUCE GuidedTour";
+  // Derive screenshot dimensions from the actual editor size. The old fixed
+  // 1230x660 / 820x440 captures added vertical padding that the plugin window
+  // does not have, making the real UI look artificially short in screenshots.
+  const int defaultWidth=editor.getWidth();
+  const int defaultHeight=editor.getHeight();
+  if(defaultWidth<=0 || defaultHeight<=0) {
+      std::fprintf(stderr,"Rack editor reported an invalid default size\\n");
+      return 2;
+  }
+  const int compactWidth=juce::roundToInt((float)defaultWidth*(2.0f/3.0f));
+  const int compactHeight=juce::roundToInt((float)defaultHeight*(2.0f/3.0f));
   options.scenes={
-      {"compact-normal",820,440,0,0,false},
-      {"compact-tour",820,440,0,1,false},
-      {"default-normal",1230,660,0,0,false},
-      {"default-tour",1230,660,0,1,false}
+      {"compact-normal",compactWidth,compactHeight,0,0,false},
+      {"compact-tour",compactWidth,compactHeight,0,1,false},
+      {"default-normal",defaultWidth,defaultHeight,0,0,false},
+      {"default-tour",defaultWidth,defaultHeight,0,1,false}
   };
   int failures=0;
   options.configure=[&](const skellcore::ui::headless::Scene& scene){
