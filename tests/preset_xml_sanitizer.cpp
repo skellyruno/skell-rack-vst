@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <set>
 
 namespace
 {
@@ -73,6 +74,48 @@ int main()
             check (false, "Roundtrip retains imported effect");
         }
     }
+
+
+    // Factory bank integrity: all 16 built-ins are unique, reference
+    // registered modules, stay within the ten-slot rack, and carry finite
+    // normalized controls. This protects the bank used by the preset browser.
+    const auto& factory = getFactoryPresets();
+    check (factory.size() == 16, "Factory bank contains all sixteen built-in presets");
+    juce::StringArray factoryNames;
+    bool factoryNamesUnique = true;
+    bool factoryControlsValid = true;
+    bool factorySlotsValid = true;
+    for (const auto& preset : factory)
+    {
+        if (factoryNames.contains (preset.name, true)) factoryNamesUnique = false;
+        factoryNames.add (preset.name);
+        factorySlotsValid = factorySlotsValid && preset.fx.size() <= (size_t) kMaxRack;
+        for (const auto& presetFx : preset.fx)
+        {
+            factoryControlsValid = factoryControlsValid && getFxInfo (presetFx.type) != nullptr;
+            for (float value : presetFx.norm)
+                factoryControlsValid = factoryControlsValid
+                    && std::isfinite (value) && value >= 0.0f && value <= 1.0f;
+        }
+    }
+    check (factoryNamesUnique, "Factory preset names contain no case-insensitive duplicates");
+    check (factorySlotsValid, "Every factory preset fits the ten-slot rack");
+    check (factoryControlsValid, "Factory modules and normalized controls are valid");
+
+    check (isFactoryPresetName ("Vocal Polish"),
+           "Factory-name lookup recognizes an exact built-in name");
+    check (isFactoryPresetName ("vocal polish"),
+           "Factory-name lookup is case-insensitive");
+    check (makeUserPresetNameForSave ("Vocal Polish") == "Vocal Polish (User)",
+           "Saving over a factory name creates a distinct user preset");
+    check (makeUserPresetNameForSave ("vocal polish") == "vocal polish (User)",
+           "Case-only factory collisions also receive a user suffix");
+    check (makeUserPresetNameForSave ("My Custom Vocal") == "My Custom Vocal",
+           "Non-factory user names remain unchanged");
+    check (makeUserPresetNameForSave ("Vocal Polish (User)") == "Vocal Polish (User)",
+           "An existing suffixed user preset can be updated by name");
+    check (makeUserPresetNameForSave ("   ").isEmpty(),
+           "Blank preset names remain rejected");
 
     return failures == 0 ? 0 : 1;
 }

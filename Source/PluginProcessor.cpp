@@ -477,11 +477,11 @@ void ModularFXAudioProcessor::processChunk (juce::AudioBuffer<float>& buf, const
                 {
                     float* d = buf.getWritePointer (ch);
                     const float* pre = preBuf.getReadPointer (ch);
-                    for (int i = 0; i < n; ++i)
+                    for (int sampleIndex = 0; sampleIndex < n; ++sampleIndex)
                     {
-                        const float w = (float) (i + 1) / (float) n;
+                        const float w = (float) (sampleIndex + 1) / (float) n;
                         const float k = wantOn ? w : 1.0f - w;
-                        d[i] = pre[i] + (d[i] - pre[i]) * k;
+                        d[sampleIndex] = pre[sampleIndex] + (d[sampleIndex] - pre[sampleIndex]) * k;
                     }
                 }
             running[(size_t) slot] = wantOn;
@@ -742,7 +742,7 @@ bool ModularFXAudioProcessor::loadPreset (int index)
 
 bool ModularFXAudioProcessor::savePreset (const juce::String& nameIn, const juce::String& tags)
 {
-    const juce::String name = nameIn.trim();
+    const juce::String name = makeUserPresetNameForSave (nameIn);
     if (name.isEmpty()) return false;
 
     PresetDef def;
@@ -826,9 +826,8 @@ int ModularFXAudioProcessor::importLatestExtracted (juce::StringArray& notes)
 
 int ModularFXAudioProcessor::addUserPreset (PresetDef def)
 {
-    bool clash = false;                                                // never replace a factory preset
-    for (const auto& p : getFactoryPresets()) clash = clash || p.name == def.name;
-    if (clash) def.name += " (imported)";
+    // Preserve factory entries even when an imported name differs only by case.
+    if (isFactoryPresetName (def.name)) def.name += " (imported)";
 
     const auto folder = getUserPresetFolder();
     if (! folder.createDirectory()) return -1;

@@ -38,7 +38,7 @@ Click the **Add Effect** tile at the end of the rack. The browser lists every ef
 
 ## Side panels
 
-- **Presets (left):** pick with the arrows or by clicking the name. Eight built-in presets are included. **Save** stores the current rack (effects, order, settings) as your own preset in `Documents`-independent app data (`~/.../ModularFXSuite/Presets` as small XML files). The ⋮ menu clears the rack or deletes the selected user preset. The **fx** button bypasses every effect.
+- **Presets (left):** pick with the arrows or by clicking the name. Sixteen built-in presets are included. **Save** stores the current rack (effects, order, settings) as your own preset in `Documents`-independent app data (`~/.../ModularFXSuite/Presets` as small XML files). The ⋮ menu clears the rack or deletes the selected user preset. The **fx** button bypasses every effect.
 - **Blend:** dry/wet for the whole rack (100% = fully effected).
 - **Volume, Pan, Reverb (right):** output fader, left/right balance, and a reverb send applied after the rack.
 
